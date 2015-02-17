@@ -29,8 +29,12 @@
 #if defined(WIN32) && defined(USE_TASKBAR)
 
 // Needed for taskbar functions
-#if defined(__GNUC__) && defined(__MINGW32__) && !defined(__MINGW64__)
-	#include "backends/taskbar/win32/mingw-compat.h"
+#if defined(__GNUC__) && defined(__MINGW32__)
+	// The mingw-compat.h header is not needed on mingw-w64
+	#include <_mingw.h>
+	#ifndef __MINGW64_VERSION_MAJOR
+		#include "backends/taskbar/win32/mingw-compat.h"
+	#endif
 #else
 	// We need certain functions that are excluded by default
 	#undef NONLS
