@@ -163,8 +163,8 @@ private:
 	int findVoiceBasic(int channel);
 	int calcVelocity(int voice, int op);
 
-	bool alsaOpenHwDep(const Common::String &name);
-	bool alsaOpen();
+	bool alsaOpenHwDep(const Common::String &name, int iface);
+	bool alsaOpen(int iface);
 	static void midiTimerCallback(void *p);
 	void setTimerCallback(void *timer_param, Common::TimerManager::TimerProc timer_proc);
 	uint32 getBaseTempo() { return 10000; }
@@ -199,7 +199,7 @@ static const int ym3812_note[13] = {
 };
 
 // From sbiload
-bool MidiPlayer_AdLibALSA::alsaOpenHwDep(const Common::String &name)
+bool MidiPlayer_AdLibALSA::alsaOpenHwDep(const Common::String &name, int iface)
 {
 	snd_hwdep_info_t *info;
 
@@ -208,7 +208,7 @@ bool MidiPlayer_AdLibALSA::alsaOpenHwDep(const Common::String &name)
 
 	snd_hwdep_info_alloca(&info);
 	if (!snd_hwdep_info(_opl, info)) {
-		if (snd_hwdep_info_get_iface(info) == SND_HWDEP_IFACE_OPL3) {
+		if (snd_hwdep_info_get_iface(info) == iface) {
 			return true;}
 	}
 	snd_hwdep_close(_opl);
@@ -216,7 +216,7 @@ bool MidiPlayer_AdLibALSA::alsaOpenHwDep(const Common::String &name)
 	return false;
 }
 
-bool MidiPlayer_AdLibALSA::alsaOpen()
+bool MidiPlayer_AdLibALSA::alsaOpen(int iface)
 {
 	int card = -1;
 	snd_ctl_t *ctl;
@@ -229,7 +229,7 @@ bool MidiPlayer_AdLibALSA::alsaOpen()
 		dev = -1;
 		while (!snd_ctl_hwdep_next_device(ctl, &dev) && dev >= 0) {
 			name = Common::String::format("hw:%d,%d", card, dev);
-			if (alsaOpenHwDep(name)) {
+			if (alsaOpenHwDep(name, iface)) {
 				snd_ctl_close(ctl);
 				return true;
 			}
@@ -240,13 +240,19 @@ bool MidiPlayer_AdLibALSA::alsaOpen()
 }
 
 int MidiPlayer_AdLibALSA::openAdLib(bool isSCI0) {
-	_stereo = true;
-
 	debug(3, "ADLIB: Starting driver in %s mode", (isSCI0 ? "SCI0" : "SCI1"));
 	_isSCI0 = isSCI0;
 
-	if (!alsaOpen())
+	if (alsaOpen(SND_HWDEP_IFACE_OPL3)) {
+		debug("AdLibALSA: Found OPL3");
+		_stereo = true;
+	} else if (alsaOpen(SND_HWDEP_IFACE_OPL2)) {
+		debug("AdLibALSA: Found OPL2");
+		_stereo = false;
+	} else {
+		debug("AdLibALSA: No OPL2/3 found");
 		return -1;
+	}
 
 	snd_hwdep_ioctl(_opl, SNDRV_DM_FM_IOCTL_RESET, nullptr);
 	snd_hwdep_ioctl(_opl, SNDRV_DM_FM_IOCTL_SET_MODE, (void *)SNDRV_DM_FM_MODE_OPL3);
@@ -288,6 +294,7 @@ void MidiPlayer_AdLibALSA::close() {
 	}
 
 	snd_hwdep_ioctl(_opl, SNDRV_DM_FM_IOCTL_RESET, nullptr);
+	snd_hwdep_close(_opl);
 	delete[] _rhythmKeyMap;
 }
 
@@ -362,19 +369,7 @@ void MidiPlayer_AdLibALSA::send(uint32 b) {
 		warning("ADLIB: Unknown event %02x", command);
 	}
 }
-#if 0
-void MidiPlayer_AdLibALSA::generateSamples(int16 *data, int len) {
-	if (isStereo())
-		len <<= 1;
-	_opl->readBuffer(data, len);
 
-	// Increase the age of the notes
-	for (int i = 0; i < kVoices; i++) {
-		if (_voices[i].note != -1)
-			_voices[i].age++;
-	}
-}
-#endif
 void MidiPlayer_AdLibALSA::loadInstrument(const byte *ins) {
 	AdLibPatch patch;
 
@@ -679,9 +674,10 @@ void MidiPlayer_AdLibALSA::setNote(int voice, int note, bool key) {
 
 	snd_hwdep_ioctl(_opl, SNDRV_DM_FM_IOCTL_PLAY_NOTE, (void *)&fmNote);
 
-	fmNote.voice += 9;
-
-	snd_hwdep_ioctl(_opl, SNDRV_DM_FM_IOCTL_PLAY_NOTE, (void *)&fmNote);
+	if (_stereo) {
+		fmNote.voice += 9;
+		snd_hwdep_ioctl(_opl, SNDRV_DM_FM_IOCTL_PLAY_NOTE, (void *)&fmNote);
+	}
 
 	setVelocity(voice);
 }
@@ -747,10 +743,12 @@ void MidiPlayer_AdLibALSA::setOperator(int voice, int opIdx, int patch, int volu
 	int velLeft = volume;
 	int velRight = volume;
 
-	if (pan > 0x40)
-		velLeft = velLeft * (0x7f - pan) / 0x3f;
-	else if (pan < 0x40)
-		velRight = velRight * pan / 0x40;
+	if (_stereo) {
+		if (pan > 0x40)
+			velLeft = velLeft * (0x7f - pan) / 0x3f;
+		else if (pan < 0x40)
+			velRight = velRight * pan / 0x40;
+	}
 
 	snd_dm_fm_voice fmVoice;
 
@@ -773,17 +771,24 @@ void MidiPlayer_AdLibALSA::setOperator(int voice, int opIdx, int patch, int volu
 
 	fmVoice.voice = voice;
 	fmVoice.left = 1;
-	fmVoice.right = 0;
+
+	if (_stereo)
+		fmVoice.right = 0;
+	else
+		fmVoice.right = 1; // For OPL3, no effect on OPL2
+
 	fmVoice.volume = velLeft;
 
 	snd_hwdep_ioctl(_opl, SNDRV_DM_FM_IOCTL_SET_VOICE, &fmVoice);
 
-	fmVoice.voice += 9;
-	fmVoice.left = 0;
-	fmVoice.right = 1;
-	fmVoice.volume = velRight;
+	if (_stereo) {
+		fmVoice.voice += 9;
+		fmVoice.left = 0;
+		fmVoice.right = 1;
+		fmVoice.volume = velRight;
 
-	snd_hwdep_ioctl(_opl, SNDRV_DM_FM_IOCTL_SET_VOICE, &fmVoice);
+		snd_hwdep_ioctl(_opl, SNDRV_DM_FM_IOCTL_SET_VOICE, &fmVoice);
+	}
 }
 
 void MidiPlayer_AdLibALSA::playSwitch(bool play) {
