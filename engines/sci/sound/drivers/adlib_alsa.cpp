@@ -242,10 +242,12 @@ bool MidiPlayer_AdLibALSA::alsaOpen(int iface)
 int MidiPlayer_AdLibALSA::openAdLib(bool isSCI0) {
 	debug(3, "ADLIB: Starting driver in %s mode", (isSCI0 ? "SCI0" : "SCI1"));
 	_isSCI0 = isSCI0;
+	bool opl3 = false;
 
 	if (alsaOpen(SND_HWDEP_IFACE_OPL3)) {
 		debug("AdLibALSA: Found OPL3");
 		_stereo = true;
+		opl3 = true;
 	} else if (alsaOpen(SND_HWDEP_IFACE_OPL2)) {
 		debug("AdLibALSA: Found OPL2");
 		_stereo = false;
@@ -255,7 +257,8 @@ int MidiPlayer_AdLibALSA::openAdLib(bool isSCI0) {
 	}
 
 	snd_hwdep_ioctl(_opl, SNDRV_DM_FM_IOCTL_RESET, nullptr);
-	snd_hwdep_ioctl(_opl, SNDRV_DM_FM_IOCTL_SET_MODE, (void *)SNDRV_DM_FM_MODE_OPL3);
+	if (opl3)
+		snd_hwdep_ioctl(_opl, SNDRV_DM_FM_IOCTL_SET_MODE, (void *)SNDRV_DM_FM_MODE_OPL3);
 
 	snd_dm_fm_params params;
 	memset(&params, 0, sizeof(params));
