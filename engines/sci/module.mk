@@ -69,6 +69,7 @@ MODULE_OBJS := \
 	sound/music.o \
 	sound/soundcmd.o \
 	sound/drivers/adlib.o \
+	sound/drivers/adlib_alsa.o \
 	sound/drivers/amigamac.o \
 	sound/drivers/cms.o \
 	sound/drivers/fb01.o \
