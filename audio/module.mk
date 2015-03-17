@@ -38,6 +38,7 @@ MODULE_OBJS := \
 	mods/tfmx.o \
 	softsynth/adlib.o \
 	softsynth/cms.o \
+	softsynth/opl/alsa.o \
 	softsynth/opl/dbopl.o \
 	softsynth/opl/dosbox.o \
 	softsynth/opl/mame.o \
