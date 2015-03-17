@@ -123,7 +123,8 @@ SDL_AudioSpec SdlMixerManager::getAudioSpec(uint32 outputRate) {
 	// that it must be a power of two. So e.g. at 22050 Hz, we request a
 	// sample buffer size of 2048.
 	uint32 samples = 8192;
-	while (samples * 16 > samplesPerSec * 2)
+	// HACK: Increase callbacks for hardware OPL
+	while (samples * 120 > samplesPerSec)
 		samples >>= 1;
 
 	memset(&desired, 0, sizeof(desired));
