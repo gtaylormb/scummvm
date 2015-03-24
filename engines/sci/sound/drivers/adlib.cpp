@@ -233,8 +233,11 @@ int MidiDriver_AdLib::openAdLib(bool isSCI0) {
 	if (!_opl)
 		return -1;
 
-	if (!_opl->init(rate))
+	if (!_opl->init(rate)) {
+		delete _opl;
+		_opl = nullptr;
 		return -1;
+	}
 
 	setRegister(0xBD, 0);
 	setRegister(0x08, 0);
