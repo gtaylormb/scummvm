@@ -95,8 +95,10 @@ OPL::OPL(Config::OplType type) : _type(type), _opl(nullptr), _iface(0) {
 }
 
 OPL::~OPL() {
-	if (_opl)
+	if (_opl) {
+		snd_hwdep_ioctl(_opl, SNDRV_DM_FM_IOCTL_RESET, nullptr);
 		snd_hwdep_close(_opl);
+	}
 }
 
 void OPL::clear() {
