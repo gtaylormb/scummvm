@@ -23,6 +23,7 @@
 #ifndef AUDIO_SOFTSYNTH_EMUMIDI_H
 #define AUDIO_SOFTSYNTH_EMUMIDI_H
 
+#include "common/system.h"
 #include "audio/audiostream.h"
 #include "audio/mididrv.h"
 #include "audio/mixer.h"
@@ -37,13 +38,20 @@ private:
 	Common::TimerManager::TimerProc _timerProc;
 	void *_timerParam;
 
-	enum {
-		FIXP_SHIFT = 16
-	};
+	static void timer(void *c) {
+		MidiDriver_Emulated *drv = static_cast<MidiDriver_Emulated *>(c);
+		if (drv->_timerProc)
+			(*drv->_timerProc)(drv->_timerParam);
+		drv->onTimer();
+	}
 
-	int _nextTick;
-	int _samplesPerTick;
+	void installTimer() {
+		g_system->getTimerManager()->installTimerProc(timer, 1000000 / _baseFreq, this, "EMUMIDI");		
+	}
 
+	void removeTimer() {
+		g_system->getTimerManager()->removeTimerProc(timer);
+	}
 protected:
 	int _baseFreq;
 
@@ -56,31 +64,36 @@ public:
 		_isOpen(false),
 		_timerProc(0),
 		_timerParam(0),
-		_nextTick(0),
-		_samplesPerTick(0),
-		_baseFreq(250) {
+		_baseFreq(100) {
+	}
+
+	~MidiDriver_Emulated() {
+		if (_isOpen)
+			close();
 	}
 
 	// MidiDriver API
 	virtual int open() {
+		installTimer();
 		_isOpen = true;
 
-		int d = getRate() / _baseFreq;
-		int r = getRate() % _baseFreq;
-
-		// This is equivalent to (getRate() << FIXP_SHIFT) / BASE_FREQ
-		// but less prone to arithmetic overflow.
-
-		_samplesPerTick = (d << FIXP_SHIFT) + (r << FIXP_SHIFT) / _baseFreq;
-
 		return 0;
+	}
+
+	virtual void close() {
+		_isOpen = false;
+		removeTimer();
 	}
 
 	bool isOpen() const { return _isOpen; }
 
 	virtual void setTimerCallback(void *timer_param, Common::TimerManager::TimerProc timer_proc) {
+		if (_isOpen)
+			removeTimer();
 		_timerProc = timer_proc;
 		_timerParam = timer_param;
+		if (_isOpen)
+			installTimer();
 	}
 
 	virtual uint32 getBaseTempo() {
@@ -89,31 +102,7 @@ public:
 
 	// AudioStream API
 	virtual int readBuffer(int16 *data, const int numSamples) {
-		const int stereoFactor = isStereo() ? 2 : 1;
-		int len = numSamples / stereoFactor;
-		int step;
-
-		do {
-			step = len;
-			if (step > (_nextTick >> FIXP_SHIFT))
-				step = (_nextTick >> FIXP_SHIFT);
-
-			generateSamples(data, step);
-
-			_nextTick -= step << FIXP_SHIFT;
-			if (!(_nextTick >> FIXP_SHIFT)) {
-				if (_timerProc)
-					(*_timerProc)(_timerParam);
-
-				onTimer();
-
-				_nextTick += _samplesPerTick;
-			}
-
-			data += step * stereoFactor;
-			len -= step;
-		} while (len);
-
+		memset(data, 0, numSamples * 2);
 		return numSamples;
 	}
 
