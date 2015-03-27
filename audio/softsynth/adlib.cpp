@@ -1463,6 +1463,7 @@ void MidiDriver_ADLIB::close() {
 	_isOpen = false;
 
 	_mixer->stopHandle(_mixerSoundHandle);
+	MidiDriver_Emulated::close();
 
 	uint i;
 	for (i = 0; i < ARRAYSIZE(_voices); ++i) {
