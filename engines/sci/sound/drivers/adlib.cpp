@@ -252,6 +252,7 @@ int MidiDriver_AdLib::openAdLib(bool isSCI0) {
 
 void MidiDriver_AdLib::close() {
 	_mixer->stopHandle(_mixerSoundHandle);
+	MidiDriver_Emulated::close();
 
 	delete _opl;
 	delete[] _rhythmKeyMap;
