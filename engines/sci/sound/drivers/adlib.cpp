@@ -66,6 +66,7 @@ public:
 
 	// MidiDriver_Emulated
 	void generateSamples(int16 *buf, int len);
+	void onTimer();
 
 	void setVolume(byte volume);
 	void playSwitch(bool play);
@@ -334,7 +335,9 @@ void MidiDriver_AdLib::generateSamples(int16 *data, int len) {
 	if (isStereo())
 		len <<= 1;
 	_opl->readBuffer(data, len);
+}
 
+void MidiDriver_AdLib::onTimer() {
 	// Increase the age of the notes
 	for (int i = 0; i < kVoices; i++) {
 		if (_voices[i].note != -1)
