@@ -28,12 +28,11 @@ namespace Adl {
 Console::Console(AdlEngine *engine) : GUI::Debugger() {
 	_engine = engine;
 
-	registerCmd("help", WRAP_METHOD(Console, Cmd_Help));
-	registerCmd("nouns", WRAP_METHOD(Console, Cmd_Nouns));
-	registerCmd("verbs", WRAP_METHOD(Console, Cmd_Verbs));
+	registerCmd("nouns", WRAP_METHOD(Console, cmdNouns));
+	registerCmd("verbs", WRAP_METHOD(Console, cmdVerbs));
 }
 
-static Common::String toAscii(const Common::String &str) {
+Common::String Console::toAscii(const Common::String &str) {
 	Common::String ascii(str);
 
 	for (uint i = 0; i < ascii.size(); ++i)
@@ -42,14 +41,7 @@ static Common::String toAscii(const Common::String &str) {
 	return ascii;
 }
 
-bool Console::Cmd_Help(int argc, const char **argv) {
-	debugPrintf("Parser:\n");
-	debugPrintf(" verbs - Lists the vocabulary verbs\n");
-	debugPrintf(" nouns - Lists the vocabulary nouns\n");
-	return true;
-}
-
-bool Console::Cmd_Verbs(int argc, const char **argv) {
+bool Console::cmdVerbs(int argc, const char **argv) {
 	if (argc != 1) {
 		debugPrintf("Usage: %s\n", argv[0]);
 		return true;
@@ -60,7 +52,7 @@ bool Console::Cmd_Verbs(int argc, const char **argv) {
 	return true;
 }
 
-bool Console::Cmd_Nouns(int argc, const char **argv) {
+bool Console::cmdNouns(int argc, const char **argv) {
 	if (argc != 1) {
 		debugPrintf("Usage: %s\n", argv[0]);
 		return true;

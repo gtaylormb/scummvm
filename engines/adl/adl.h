@@ -54,10 +54,15 @@ class Speaker;
 struct AdlGameDescription;
 struct ScriptEnv;
 
+enum kDebugChannels {
+	kDebugChannelScript = 1 << 0
+};
+
 // Save and restore opcodes
 #define IDO_ACT_SAVE           0x0f
 #define IDO_ACT_LOAD           0x10
 
+#define IDI_VOID_ROOM 0xfd
 #define IDI_ANY 0xfe
 
 #define IDI_WORD_SIZE 8
@@ -115,9 +120,33 @@ public:
 		       (_cmd.noun == IDI_ANY || _cmd.noun == _noun);
 	}
 
+	void dbgMatch(const Common::StringArray &verbs, const Common::StringArray &nouns) const {
+		debugN("IF\n\tROOM == ");
+		if (_cmd.room == IDI_ANY)
+			debugN("*");
+		else
+			debugN("%d", _cmd.room);
+
+		debugN("\n\t&& SAID(");
+		if (_cmd.verb == IDI_ANY)
+			debugN("*");
+		else
+			debugN("\"%s\"", Console::toAscii(verbs[_cmd.verb - 1]).c_str());
+
+		debugN(", ");
+		if (_cmd.noun == IDI_ANY)
+			debugN("*");
+		else
+			debugN("\"%s\"", Console::toAscii(nouns[_cmd.noun - 1]).c_str());
+
+		debugN(")\n");
+	}
+
 	byte getCondCount() const { return _cmd.numCond; }
 	byte getActCount() const { return _cmd.numAct; }
 	byte getNoun() const { return _noun; }
+	byte getVerb() const { return _verb; }
+	byte getRoom() const { return _room; }
 
 private:
 	const Command &_cmd;
@@ -195,7 +224,7 @@ protected:
 	Common::String inputString(byte prompt = 0) const;
 	byte inputKey(bool showCursor = true) const;
 
-	void loadWords(Common::ReadStream &stream, WordMap &map) const;
+	void loadWords(Common::ReadStream &stream, WordMap &map, Common::StringArray &pri) const;
 	void readCommands(Common::ReadStream &stream, Commands &commands);
 	void checkInput(byte verb, byte noun);
 
@@ -210,7 +239,6 @@ protected:
 	int o1_isVarEQ(ScriptEnv &e);
 	int o1_isCurPicEQ(ScriptEnv &e);
 	int o1_isItemPicEQ(ScriptEnv &e);
-
 	int o1_varAdd(ScriptEnv &e);
 	int o1_varSub(ScriptEnv &e);
 	int o1_varSet(ScriptEnv &e);
@@ -234,6 +262,36 @@ protected:
 	int o1_takeItem(ScriptEnv &e);
 	int o1_dropItem(ScriptEnv &e);
 	int o1_setRoomPic(ScriptEnv &e);
+
+	// Debug
+	int dbg_isItemInRoom(ScriptEnv &e);
+	int dbg_isMovesGT(ScriptEnv &e);
+	int dbg_isVarEQ(ScriptEnv &e);
+	int dbg_isCurPicEQ(ScriptEnv &e);
+	int dbg_isItemPicEQ(ScriptEnv &e);
+	int dbg_varAdd(ScriptEnv &e);
+	int dbg_varSub(ScriptEnv &e);
+	int dbg_varSet(ScriptEnv &e);
+	int dbg_listInv(ScriptEnv &e);
+	int dbg_moveItem(ScriptEnv &e);
+	int dbg_setRoom(ScriptEnv &e);
+	int dbg_setCurPic(ScriptEnv &e);
+	int dbg_setPic(ScriptEnv &e);
+	int dbg_printMsg(ScriptEnv &e);
+	int dbg_setLight(ScriptEnv &e);
+	int dbg_setDark(ScriptEnv &e);
+	int dbg_save(ScriptEnv &e);
+	int dbg_restore(ScriptEnv &e);
+	int dbg_restart(ScriptEnv &e);
+	int dbg_quit(ScriptEnv &e);
+	int dbg_placeItem(ScriptEnv &e);
+	int dbg_setItemPic(ScriptEnv &e);
+	int dbg_resetPic(ScriptEnv &e);
+	template <Direction D>
+	int dbg_goDirection(ScriptEnv &e);
+	int dbg_takeItem(ScriptEnv &e);
+	int dbg_dropItem(ScriptEnv &e);
+	int dbg_setRoomPic(ScriptEnv &e);
 
 	// Graphics
 	void clearScreen() const;
@@ -259,6 +317,15 @@ protected:
 	bool doOneCommand(const Commands &commands, byte verb, byte noun);
 	void doAllCommands(const Commands &commands, byte verb, byte noun);
 
+	// Debug functions
+	static Common::String dbgToAscii(const Common::String &str);
+	Common::String dbgGetItemStr(uint i) const;
+	Common::String dbgGetRoomStr(uint i) const;
+	Common::String dbgGetItemRoomStr(uint i) const;
+	Common::String dbgGetVerbStr(uint i) const;
+	Common::String dbgGetNounStr(uint i) const;
+	Common::String dbgGetMsgStr(uint i) const;
+
 	Display *_display;
 	GraphicsMan *_graphics;
 	Speaker *_speaker;
@@ -266,6 +333,7 @@ protected:
 	// Opcodes
 	typedef Common::Functor1<ScriptEnv &, int> Opcode;
 	Common::Array<const Opcode *> _condOpcodes, _actOpcodes;
+	Common::Array<const Opcode *> _condOpcodesDbg, _actOpcodesDbg;
 	// Message strings in data file
 	Common::Array<Common::String> _messages;
 	// Picture data
@@ -280,6 +348,8 @@ protected:
 
 	WordMap _verbs;
 	WordMap _nouns;
+	Common::StringArray _priVerbs;
+	Common::StringArray _priNouns;
 
 	struct {
 		Common::String enterCommand;
