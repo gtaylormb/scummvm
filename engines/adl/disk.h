@@ -165,6 +165,31 @@ private:
 	Common::HashMap<Common::String, TOCEntry> _toc;
 };
 
+// On the Apple II, sector headers contain a disk volume number. This number
+// is used by ADL multi-disk games. The PC port has the disk volume number
+// as the first data byte of every sector that contains game data. We need
+// to skip this number as we read in the data. Additionally, the data is now
+// prefixed with an uint16 containing the data size.
+class DataBlock_PC : public DataBlock {
+public:
+	DataBlock_PC(DiskImage *disk, byte track, byte sector, uint16 offset) :
+			_disk(disk),
+			_track(track),
+			_sector(sector),	
+			_offset(offset) { }
+
+	virtual ~DataBlock_PC() { }
+
+	virtual Common::SeekableReadStream *createReadStream();
+
+private:
+	void read(Common::SeekableReadStream &stream, byte *const dataPtr, const uint32 size);
+
+	DiskImage *_disk;
+	byte _track, _sector;
+	uint16 _offset;
+};
+
 } // End of namespace Adl
 
 #endif

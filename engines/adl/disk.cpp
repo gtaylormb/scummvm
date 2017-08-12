@@ -39,6 +39,45 @@ static Common::SeekableReadStream *readImage(const Common::String &filename) {
 	return f;
 }
 
+void DataBlock_PC::read(Common::SeekableReadStream &stream, byte *const dataPtr, const uint32 size) {
+	uint32 ofs = 0;
+
+	while (ofs < size) {
+		const byte bps = _disk->getBytesPerSector();
+		uint bytesToRead = bps - ((_offset + stream.pos()) % bps);
+
+		if (bytesToRead == bps) {
+			stream.readByte(); // Skip volume byte
+			--bytesToRead;
+		}
+
+		if (bytesToRead > size - ofs)
+			bytesToRead = size - ofs;
+
+		if (stream.read(dataPtr + ofs, bytesToRead) < bytesToRead)
+			error("Failed to read data block");
+
+		ofs += bytesToRead;
+	}
+}
+
+Common::SeekableReadStream *DataBlock_PC::createReadStream() {
+	StreamPtr diskStream(_disk->createReadStream(_track, _sector, _offset, 1));
+
+	byte sizeBuf[2];
+	read(*diskStream, sizeBuf, 2);
+
+	uint16 blockSize = READ_LE_UINT16(sizeBuf);
+	uint16 sectors = (blockSize + 2) / (_disk->getBytesPerSector() - 1);
+
+	diskStream.reset(_disk->createReadStream(_track, _sector, _offset, sectors));
+
+	byte *buf = (byte *)malloc(blockSize);
+	read(*diskStream, buf, blockSize);
+
+	return new Common::MemoryReadStream(buf, blockSize, DisposeAfterUse::YES);
+}
+
 const uint trackLen = 256 * 26;
 
 // 4-and-4 encoding (odd-even)
