@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -38,6 +38,7 @@
 
 #include "gui/debugger.h"
 
+#include "engines/advancedDetector.h"
 #include "engines/engine.h"
 #include "engines/util.h"
 
@@ -51,7 +52,17 @@
 
 namespace Prince {
 
-struct PrinceGameDescription;
+enum PrinceGameType {
+	kPrinceDataUNK,
+	kPrinceDataDE,
+	kPrinceDataPL
+};
+
+struct PrinceGameDescription {
+	ADGameDescription desc;
+	PrinceGameType gameType;
+};
+
 struct SavegameHeader;
 
 class PrinceEngine;
@@ -69,6 +80,21 @@ class Hero;
 class Animation;
 class Room;
 class Pscr;
+
+enum {
+	GF_TRANSLATED = 1 << 0
+};
+
+struct SavegameHeader {
+	uint8 version;
+	Common::String saveName;
+	Graphics::Surface *thumbnail;
+	int saveYear, saveMonth, saveDay;
+	int saveHour, saveMinutes;
+};
+
+#define kSavegameStrSize 14
+#define kSavegameStr "SCUMMVM_PRINCE"
 
 struct Text {
 	const char *_str;

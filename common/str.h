@@ -162,6 +162,9 @@ public:
 	bool contains(const char *x) const;
 	bool contains(char x) const;
 
+	/** Return uint64 corrensponding to String's contents. */
+	uint64 asUint64() const;
+
 	/**
 	 * Simple DOS-style pattern matching function (understands * and ? like used in DOS).
 	 * Taken from exult/files/listfiles.cc
@@ -232,13 +235,24 @@ public:
 	 */
 	void trim();
 
+	/**
+	 * Wraps the text in the string to the given line maximum. Lines will be
+	 * broken at any whitespace character. New lines are assumed to be
+	 * represented using '\n'.
+	 *
+	 * This is a very basic line wrap which does not perform tab stop
+	 * calculation, consecutive whitespace collapsing, auto-hyphenation, or line
+	 * balancing.
+	 */
+	void wordWrap(const uint32 maxLength);
+
 	uint hash() const;
-	 
+
 	/**@{
 	 * Functions to replace some amount of chars with chars from some other string.
 	 *
 	 * @note The implementation follows that of the STL's std::string:
-	 *       http://www.cplusplus.com/reference/string/string/replace/        
+	 *       http://www.cplusplus.com/reference/string/string/replace/
 	 *
 	 * @param pos Starting position for the replace in the original string.
 	 * @param count Number of chars to replace from the original string.
@@ -247,7 +261,7 @@ public:
 	 * @param countOri Same as count
 	 * @param posDest Initial position to read str from.
 	 * @param countDest Number of chars to read from str. npos by default.
-	 */ 
+	 */
 	// Replace 'count' bytes, starting from 'pos' with str.
 	void replace(uint32 pos, uint32 count, const String &str);
 	// The same as above, but accepts a C-like array of characters.
@@ -264,7 +278,7 @@ public:
 	// str[posDest, posDest + countDest)
 	void replace(uint32 posOri, uint32 countOri, const char *str,
 					uint32 posDest, uint32 countDest);
-	/**@}*/ 
+	/**@}*/
 
 	/**
 	 * Print formatted data into a String object. Similar to sprintf,
@@ -387,6 +401,15 @@ String normalizePath(const String &path, const char sep);
  */
 bool matchString(const char *str, const char *pat, bool ignoreCase = false, bool pathMode = false);
 
+/**
+ * Function which replaces substring with the other. It happens in place.
+ * If there is no substring found, original string is not changed.
+ *
+ * @param source String to search and replace substring in.
+ * @param what Substring to replace.
+ * @param with String to replace with.
+ */
+void replace(Common::String &source, const Common::String &what, const Common::String &with);
 
 /**
  * Take a 32 bit value and turn it into a four character string, where each of
@@ -431,6 +454,17 @@ size_t strlcpy(char *dst, const char *src, size_t size);
  *         size + strlen(src) is returned.
  */
 size_t strlcat(char *dst, const char *src, size_t size);
+
+/**
+ * Determine the length of a string up to a maximum of `maxSize` characters.
+ * This should be used instead of `strlen` when reading the length of a C string
+ * from potentially unsafe or corrupt sources, like game assets.
+ *
+ * @param src The source string.
+ * @param maxSize The maximum size of the string.
+ * @return The length of the string.
+ */
+size_t strnlen(const char *src, size_t maxSize);
 
 /**
  * Convenience wrapper for tag2string which "returns" a C string.

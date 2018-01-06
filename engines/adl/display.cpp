@@ -33,13 +33,11 @@
 #include "engines/util.h"
 
 #include "adl/display.h"
+#include "adl/adl.h"
 
 namespace Adl {
 
 // This implements the Apple II "Hi-Res" display mode
-
-#define DISPLAY_PITCH (DISPLAY_WIDTH / 7)
-#define DISPLAY_SIZE (DISPLAY_PITCH * DISPLAY_HEIGHT)
 
 #define TEXT_BUF_SIZE (TEXT_WIDTH * TEXT_HEIGHT)
 
@@ -54,6 +52,9 @@ static const byte colorPalette[COLOR_PALETTE_ENTRIES * 3] = {
 	0x0d, 0xa1, 0xff,
 	0xf2, 0x5e, 0x00
 };
+
+// Opacity of the optional scanlines (percentage)
+#define SCANLINE_OPACITY 75
 
 // Corresponding color in second palette
 #define PAL2(X) ((X) | 0x04)
@@ -109,8 +110,6 @@ Display::Display() :
 		_cursorPos(0),
 		_showCursor(false) {
 
-	initGraphics(DISPLAY_WIDTH * 2, DISPLAY_HEIGHT * 2, true);
-
 	_monochrome = !ConfMan.getBool("color");
 	_scanlines = ConfMan.getBool("scanlines");
 
@@ -129,12 +128,14 @@ Display::Display() :
 	_frameBufSurface->create(DISPLAY_WIDTH * 2, DISPLAY_HEIGHT * 2, Graphics::PixelFormat::createFormatCLUT8());
 
 	_textBuf = new byte[TEXT_BUF_SIZE];
-	memset(_textBuf, APPLECHAR(' '), TEXT_BUF_SIZE);
+	memset(_textBuf, (byte)APPLECHAR(' '), TEXT_BUF_SIZE);
 	_textBufSurface = new Graphics::Surface;
 	// For ease of copying, also use 2x scaling here
 	_textBufSurface->create(DISPLAY_WIDTH * 2, DISPLAY_HEIGHT * 2, Graphics::PixelFormat::createFormatCLUT8());
 
 	createFont();
+
+	_startMillis = g_system->getMillis();
 }
 
 Display::~Display() {
@@ -197,8 +198,7 @@ bool Display::saveThumbnail(Common::WriteStream &out) {
 	return retval;
 }
 
-void Display::loadFrameBuffer(Common::ReadStream &stream) {
-	byte *dst = _frameBuf;
+void Display::loadFrameBuffer(Common::ReadStream &stream, byte *dst) {
 	for (uint j = 0; j < 8; ++j) {
 		for (uint i = 0; i < 8; ++i) {
 			stream.read(dst, DISPLAY_PITCH);
@@ -215,6 +215,10 @@ void Display::loadFrameBuffer(Common::ReadStream &stream) {
 
 	if (stream.eos() || stream.err())
 		error("Failed to read frame buffer");
+}
+
+void Display::loadFrameBuffer(Common::ReadStream &stream) {
+	loadFrameBuffer(stream, _frameBuf);
 }
 
 void Display::putPixel(const Common::Point &p, byte color) {
@@ -237,6 +241,12 @@ void Display::putPixel(const Common::Point &p, byte color) {
 	writeFrameBuffer(p, color, mask);
 }
 
+void Display::setPixelByte(const Common::Point &p, byte color) {
+	assert(p.x >= 0 && p.x < DISPLAY_WIDTH && p.y >= 0 && p.y < DISPLAY_HEIGHT);
+
+	_frameBuf[p.y * DISPLAY_PITCH + p.x / 7] = color;
+}
+
 void Display::setPixelBit(const Common::Point &p, byte color) {
 	writeFrameBuffer(p, color, 1 << (p.x % 7));
 }
@@ -245,7 +255,15 @@ void Display::setPixelPalette(const Common::Point &p, byte color) {
 	writeFrameBuffer(p, color, 0x80);
 }
 
+byte Display::getPixelByte(const Common::Point &p) const {
+	assert(p.x >= 0 && p.x < DISPLAY_WIDTH && p.y >= 0 && p.y < DISPLAY_HEIGHT);
+
+	return _frameBuf[p.y * DISPLAY_PITCH + p.x / 7];
+}
+
 bool Display::getPixelBit(const Common::Point &p) const {
+	assert(p.x >= 0 && p.x < DISPLAY_WIDTH && p.y >= 0 && p.y < DISPLAY_HEIGHT);
+
 	byte *b = _frameBuf + p.y * DISPLAY_PITCH + p.x / 7;
 	return *b & (1 << (p.x % 7));
 }
@@ -264,7 +282,7 @@ void Display::clear(byte color) {
 }
 
 void Display::home() {
-	memset(_textBuf, APPLECHAR(' '), TEXT_BUF_SIZE);
+	memset(_textBuf, (byte)APPLECHAR(' '), TEXT_BUF_SIZE);
 	_cursorPos = 0;
 }
 
@@ -291,7 +309,10 @@ void Display::moveCursorTo(const Common::Point &pos) {
 void Display::printChar(char c) {
 	if (c == APPLECHAR('\r'))
 		_cursorPos = (_cursorPos / TEXT_WIDTH + 1) * TEXT_WIDTH;
-	else if ((byte)c < 0x80 || (byte)c >= 0xa0) {
+	else if (c == APPLECHAR('\a')) {
+		updateTextScreen();
+		static_cast<AdlEngine *>(g_engine)->bell();
+	} else if ((byte)c < 0x80 || (byte)c >= 0xa0) {
 		setCharAtCursor(c);
 		++_cursorPos;
 	}
@@ -327,6 +348,8 @@ void Display::showCursor(bool enable) {
 }
 
 void Display::writeFrameBuffer(const Common::Point &p, byte color, byte mask) {
+	assert(p.x >= 0 && p.x < DISPLAY_WIDTH && p.y >= 0 && p.y < DISPLAY_HEIGHT);
+
 	byte *b = _frameBuf + p.y * DISPLAY_PITCH + p.x / 7;
 	color ^= *b;
 	color &= mask;
@@ -334,14 +357,16 @@ void Display::writeFrameBuffer(const Common::Point &p, byte color, byte mask) {
 }
 
 void Display::showScanlines(bool enable) {
-	byte pal[COLOR_PALETTE_ENTRIES * 3] = { };
+	byte pal[COLOR_PALETTE_ENTRIES * 3];
 
-	if (enable)
-		g_system->getPaletteManager()->setPalette(pal, COLOR_PALETTE_ENTRIES, COLOR_PALETTE_ENTRIES);
-	else {
-		g_system->getPaletteManager()->grabPalette(pal, 0, COLOR_PALETTE_ENTRIES);
-		g_system->getPaletteManager()->setPalette(pal, COLOR_PALETTE_ENTRIES, COLOR_PALETTE_ENTRIES);
+	g_system->getPaletteManager()->grabPalette(pal, 0, COLOR_PALETTE_ENTRIES);
+
+	if (enable) {
+		for (uint i = 0; i < ARRAYSIZE(pal); ++i)
+			pal[i] = pal[i] * (100 - SCANLINE_OPACITY) / 100;
 	}
+
+	g_system->getPaletteManager()->setPalette(pal, COLOR_PALETTE_ENTRIES, COLOR_PALETTE_ENTRIES);
 }
 
 static byte processColorBits(uint16 &bits, bool &odd, bool secondPal) {
@@ -489,7 +514,11 @@ void Display::updateTextSurface() {
 			r.translate(((c & 0x3f) % 16) * 7 * 2, (c & 0x3f) / 16 * 8 * 2);
 
 			if (!(c & 0x80)) {
-				if (!(c & 0x40) || ((g_system->getMillis() / 270) & 1))
+				// Blink text. We subtract _startMillis to make this compatible
+				// with the event recorder, which returns offsetted values on
+				// playback.
+				const uint32 millisPassed = g_system->getMillis() - _startMillis;
+				if (!(c & 0x40) || ((millisPassed / 270) & 1))
 					r.translate(0, 4 * 8 * 2);
 			}
 
@@ -537,7 +566,7 @@ void Display::createFont() {
 
 void Display::scrollUp() {
 	memmove(_textBuf, _textBuf + TEXT_WIDTH, TEXT_BUF_SIZE - TEXT_WIDTH);
-	memset(_textBuf + TEXT_BUF_SIZE - TEXT_WIDTH, APPLECHAR(' '), TEXT_WIDTH);
+	memset(_textBuf + TEXT_BUF_SIZE - TEXT_WIDTH, (byte)APPLECHAR(' '), TEXT_WIDTH);
 	if (_cursorPos >= TEXT_WIDTH)
 		_cursorPos -= TEXT_WIDTH;
 }

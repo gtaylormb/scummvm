@@ -216,7 +216,7 @@ void GuiManager::redraw() {
 	// Tanoku: Do not apply shading more than once when opening many dialogs
 	// on top of each other. Screen ends up being too dark and it's a
 	// performance hog.
-	if (_redrawStatus == kRedrawOpenDialog && _dialogStack.size() > 2)
+	if (_redrawStatus == kRedrawOpenDialog && _dialogStack.size() > 3)
 		shading = ThemeEngine::kShadingNone;
 
 	switch (_redrawStatus) {
@@ -252,6 +252,23 @@ Dialog *GuiManager::getTopDialog() const {
 	if (_dialogStack.empty())
 		return 0;
 	return _dialogStack.top();
+}
+
+void GuiManager::addToTrash(GuiObject* object, Dialog* parent) {
+	debug(7, "Adding Gui Object %p to trash", (void *)object);
+	GuiObjectTrashItem t;
+	t.object = object;
+	t.parent = 0;
+	// If a dialog was provided, check it is in the dialog stack
+	if (parent != 0) {
+		for (uint i = 0 ; i < _dialogStack.size() ; ++i) {
+			if (_dialogStack[i] == parent) {
+				t.parent = parent;
+				break;
+			}
+		}
+	}
+	_guiObjectTrash.push_back(t);
 }
 
 void GuiManager::runLoop() {
@@ -326,16 +343,30 @@ void GuiManager::runLoop() {
 			//
 			// This hopefully fixes strange behavior/crashes with pop-up widgets. (Most easily
 			// triggered in 3x mode or when running ScummVM under Valgrind.)
-			if (activeDialog != getTopDialog() && event.type != Common::EVENT_SCREEN_CHANGED)
+			if (activeDialog != getTopDialog() && event.type != Common::EVENT_SCREEN_CHANGED) {
+				processEvent(event, getTopDialog());
 				continue;
+			}
 
 			processEvent(event, activeDialog);
+
 
 			if (lastRedraw + waitTime < _system->getMillis(true)) {
 				lastRedraw = _system->getMillis(true);
 				_theme->updateScreen();
 				_system->updateScreen();
 			}
+		}
+
+		// Delete GuiObject that have been added to the trash for a delayed deletion
+		Common::List<GuiObjectTrashItem>::iterator it = _guiObjectTrash.begin();
+		while (it != _guiObjectTrash.end()) {
+			if ((*it).parent == 0 || (*it).parent == activeDialog) {
+				debug(7, "Delayed deletion of Gui Object %p", (void *)(*it).object);
+				delete (*it).object;
+				it = _guiObjectTrash.erase(it);
+			} else
+				++it;
 		}
 
 		if (_lastMousePosition.time + kTooltipDelay < _system->getMillis(true)) {
@@ -504,6 +535,8 @@ void GuiManager::screenChange() {
 }
 
 void GuiManager::processEvent(const Common::Event &event, Dialog *const activeDialog) {
+	if (activeDialog == 0)
+		return;
 	int button;
 	uint32 time;
 	Common::Point mouse(event.mouse.x - activeDialog->_x, event.mouse.y - activeDialog->_y);
@@ -562,6 +595,12 @@ void GuiManager::processEvent(const Common::Event &event, Dialog *const activeDi
 	#endif
 		break;
 	}
+}
+
+void GuiManager::doFullRedraw() {
+	_redrawStatus = kRedrawFull;
+	redraw();
+	_system->updateScreen();
 }
 
 void GuiManager::giveFocusToDialog(Dialog *dialog) {

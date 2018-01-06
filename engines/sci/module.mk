@@ -12,6 +12,7 @@ MODULE_OBJS := \
 	engine/features.o \
 	engine/file.o \
 	engine/gc.o \
+	engine/guest_additions.o \
 	engine/kernel.o \
 	engine/kevent.o \
 	engine/kfile.o \
@@ -91,6 +92,9 @@ MODULE_OBJS += \
 	graphics/remap32.o \
 	graphics/screen_item32.o \
 	graphics/text32.o \
+	graphics/transitions32.o \
+	graphics/video32.o \
+	graphics/cursor32.o \
 	sound/audio32.o \
 	sound/decoders/sol.o \
 	video/robot_decoder.o

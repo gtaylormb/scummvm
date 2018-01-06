@@ -198,7 +198,7 @@ static const ToltecsGameDescription gameDescriptions[] = {
 
 static const ExtraGuiOption toltecsExtraGuiOption = {
 	_s("Use original save/load screens"),
-	_s("Use the original save/load screens, instead of the ScummVM ones"),
+	_s("Use the original save/load screens instead of the ScummVM ones"),
 	"originalsaveload",
 	false
 };
@@ -234,7 +234,8 @@ bool ToltecsMetaEngine::hasFeature(MetaEngineFeature f) const {
 		(f == kSavesSupportMetaInfo) ||
 		(f == kSavesSupportThumbnail) ||
 		(f == kSavesSupportCreationDate) ||
-		(f == kSavesSupportPlayTime);
+		(f == kSavesSupportPlayTime) ||
+		(f == kSimpleSavesNames);
 }
 
 bool Toltecs::ToltecsEngine::hasFeature(EngineFeature f) const {

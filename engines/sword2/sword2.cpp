@@ -107,7 +107,8 @@ bool Sword2MetaEngine::hasFeature(MetaEngineFeature f) const {
 	return
 		(f == kSupportsListSaves) ||
 		(f == kSupportsLoadingDuringStartup) ||
-		(f == kSupportsDeleteSave);
+		(f == kSupportsDeleteSave) ||
+		(f == kSimpleSavesNames);
 }
 
 bool Sword2::Sword2Engine::hasFeature(EngineFeature f) const {
@@ -441,7 +442,7 @@ Common::Error Sword2Engine::run() {
 	_resman = NULL;
 	_memory = NULL;
 
-	initGraphics(640, 480, true);
+	initGraphics(640, 480);
 	_screen = new Screen(this, 640, 480);
 
 	// Create the debugger as early as possible (but not before the

@@ -75,13 +75,13 @@ public:
 	/**
 	 * Draws an image frame at a given position within this surface with transparency
 	 */
-	void SHtransBlitFrom(const ImageFrame &src, const Common::Point &pt,
+	virtual void SHtransBlitFrom(const ImageFrame &src, const Common::Point &pt,
 		bool flipped = false, int overrideColor = 0, int scaleVal = SCALE_THRESHOLD);
 
 	/**
 	 * Draws an image frame at a given position within this surface with transparency
 	 */
-	void SHtransBlitFrom(const Graphics::Surface &src, const Common::Point &pt,
+	virtual void SHtransBlitFrom(const Graphics::Surface &src, const Common::Point &pt,
 		bool flipped = false, int overrideColor = 0, int scaleVal = SCALE_THRESHOLD);
 
 	/**
@@ -121,7 +121,7 @@ protected:
 	virtual void addDirtyRect(const Common::Rect &r) {}
 public:
 	Surface() : BaseSurface() {}
-	Surface(int width, int height) : BaseSurface(width, height) {}
+	Surface(int width_, int height_) : BaseSurface(width_, height_) {}
 };
 
 } // End of namespace Sherlock

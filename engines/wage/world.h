@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -48,10 +48,15 @@
 #ifndef WAGE_WORLD_H
 #define WAGE_WORLD_H
 
-#include "wage/macwindowmanager.h"
+#include "wage/entities.h"
+#include "graphics/macgui/macwindowmanager.h"
 
 namespace Wage {
 
+// Import the enum definitions
+using Graphics::MacPatterns;
+
+class Script;
 class Sound;
 
 class World {
@@ -87,9 +92,10 @@ public:
 	ObjArray _orderedObjs;
 	ChrArray _orderedChrs;
 	Common::Array<Sound *> _orderedSounds;
-	Patterns *_patterns;
+	Graphics::MacPatterns *_patterns;
 	Scene *_storageScene;
 	Chr *_player;
+	int _signature;
 	//List<MoveListener> moveListeners;
 
 	Common::String *_gameOverMessage;
@@ -128,9 +134,6 @@ public:
 	}
 
 	void addSound(Sound *sound);
-
-private:
-	Common::StringArray *readMenu(Common::SeekableReadStream *res);
 };
 
 } // End of namespace Wage

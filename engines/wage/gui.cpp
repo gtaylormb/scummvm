@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -49,25 +49,26 @@
 #include "common/system.h"
 #include "graphics/cursorman.h"
 #include "graphics/primitives.h"
+#include "graphics/macgui/macfontmanager.h"
+#include "graphics/macgui/macwindowmanager.h"
+#include "graphics/macgui/macwindow.h"
+#include "graphics/macgui/macmenu.h"
 
 #include "wage/wage.h"
 #include "wage/design.h"
 #include "wage/entities.h"
 #include "wage/gui.h"
-#include "wage/macwindow.h"
-#include "wage/macwindowmanager.h"
-#include "wage/macmenu.h"
 #include "wage/world.h"
 
 namespace Wage {
 
-static const MenuData menuSubItems[] = {
+static const Graphics::MacMenuData menuSubItems[] = {
 	{ kMenuHighLevel, "File",	0, 0, false },
 	{ kMenuHighLevel, "Edit",	0, 0, false },
 	{ kMenuFile, "New",			kMenuActionNew, 0, false },
-	{ kMenuFile, "Open...",		kMenuActionOpen, 0, false },
+	{ kMenuFile, "Open...",		kMenuActionOpen, 0, true },
 	{ kMenuFile, "Close",		kMenuActionClose, 0, true },
-	{ kMenuFile, "Save",		kMenuActionSave, 0, false },
+	{ kMenuFile, "Save",		kMenuActionSave, 0, true },
 	{ kMenuFile, "Save as...",	kMenuActionSaveAs, 0, true },
 	{ kMenuFile, "Revert",		kMenuActionRevert, 0, false },
 	{ kMenuFile, "Quit",		kMenuActionQuit, 0, true },
@@ -82,36 +83,7 @@ static const MenuData menuSubItems[] = {
 	{ 0, NULL,			0, 0, false }
 };
 
-static void cursorTimerHandler(void *refCon) {
-    Gui *gui = (Gui *)refCon;
-
-	int x = gui->_cursorX;
-	int y = gui->_cursorY;
-
-	if (x == 0 && y == 0)
-		return;
-
-	if (!gui->_screen.getPixels())
-		return;
-
-	x += gui->_consoleWindow->getInnerDimensions().left;
-	y += gui->_consoleWindow->getInnerDimensions().top;
-
-	gui->_screen.vLine(x, y, y + kCursorHeight, gui->_cursorState ? kColorBlack : kColorWhite);
-
-	if (!gui->_cursorOff)
-		gui->_cursorState = !gui->_cursorState;
-
-	gui->_cursorRect.left = x;
-	gui->_cursorRect.right = MIN<uint16>(x + 1, gui->_screen.w);
-	gui->_cursorRect.top = y;
-	gui->_cursorRect.bottom = MIN<uint16>(y + kCursorHeight, gui->_screen.h);
-
-	gui->_cursorDirty = true;
-}
-
 static bool sceneWindowCallback(WindowClick click, Common::Event &event, void *gui);
-static bool consoleWindowCallback(WindowClick click, Common::Event &event, void *gui);
 static void menuCommandsCallback(int action, Common::String &text, void *data);
 
 
@@ -119,29 +91,9 @@ Gui::Gui(WageEngine *engine) {
 	_engine = engine;
 	_scene = NULL;
 	_sceneDirty = true;
-	_consoleDirty = true;
-	_cursorDirty = false;
-	_consoleFullRedraw = true;
 	_screen.create(g_system->getWidth(), g_system->getHeight(), Graphics::PixelFormat::createFormatCLUT8());
 
 	_wm.setScreen(&_screen);
-
-	_scrollPos = 0;
-	_consoleLineHeight = 8; // Dummy value which makes sense
-	_consoleNumLines = 24; // Dummy value
-
-	_cursorX = 0;
-	_cursorY = 0;
-	_cursorState = false;
-	_cursorOff = false;
-
-	_inTextSelection = false;
-	_selectionStartX = _selectionStartY = -1;
-	_selectionEndX = _selectionEndY = -1;
-
-	_inputTextLineNum = 0;
-
-	g_system->getTimerManager()->installTimerProc(&cursorTimerHandler, 200000, this, "wageCursor");
 
 	_menu = _wm.addMenu();
 
@@ -166,21 +118,21 @@ Gui::Gui(WageEngine *engine) {
 	_sceneWindow = _wm.addWindow(false, false, false);
 	_sceneWindow->setCallback(sceneWindowCallback, this);
 
-	_consoleWindow = _wm.addWindow(true, true, true);
-	_consoleWindow->setCallback(consoleWindowCallback, this);
+	//TODO: Make the font we use here work
+	// (currently MacFontRun::getFont gets called with the fonts being uninitialized,
+	// so it initializes them by itself with default params, and not those here)
+	const Graphics::MacFont *font = new Graphics::MacFont(Graphics::kMacFontChicago, 8);
+
+	uint maxWidth = _screen.w;
+
+	_consoleWindow = _wm.addTextWindow(font, kColorBlack, kColorWhite, maxWidth, Graphics::kTextAlignLeft, _menu);
+
+	loadBorders();
 }
 
 Gui::~Gui() {
 	_screen.free();
 	_console.free();
-	g_system->getTimerManager()->removeTimerProc(&cursorTimerHandler);
-}
-
-void Gui::undrawCursor() {
-	_cursorOff = true;
-	_cursorState = false;
-	cursorTimerHandler(this);
-	_cursorOff = false;
 }
 
 void Gui::draw() {
@@ -206,20 +158,10 @@ void Gui::draw() {
 	}
 
 	drawScene();
-	drawConsole();
 
 	_wm.draw();
 
-	if (_cursorDirty && _cursorRect.left < _screen.w && _cursorRect.bottom < _screen.h) {
-		g_system->copyRectToScreen(_screen.getBasePtr(_cursorRect.left, _cursorRect.top), _screen.pitch,
-				_cursorRect.left, _cursorRect.top, _cursorRect.width(), _cursorRect.height());
-
-		_cursorDirty = false;
-	}
-
 	_sceneDirty = false;
-	_consoleDirty = false;
-	_consoleFullRedraw = false;
 }
 
 void Gui::drawScene() {
@@ -230,9 +172,7 @@ void Gui::drawScene() {
 	_sceneWindow->setDirty(true);
 
 	_sceneDirty = true;
-	_consoleDirty = true;
 	_menu->setDirty(true);
-	_consoleFullRedraw = true;
 }
 
 static bool sceneWindowCallback(WindowClick click, Common::Event &event, void *g) {
@@ -255,27 +195,11 @@ bool Gui::processSceneEvents(WindowClick click, Common::Event &event) {
 	return false;
 }
 
-// Render console
-void Gui::drawConsole() {
-	if (!_consoleDirty && !_consoleFullRedraw && !_sceneDirty)
-		return;
-
-	renderConsole(_consoleWindow->getSurface(), Common::Rect(kBorderWidth - 2, kBorderWidth - 2,
-				_consoleWindow->getDimensions().width(), _consoleWindow->getDimensions().height()));
-	_consoleWindow->setDirty(true);
-}
-
-static bool consoleWindowCallback(WindowClick click, Common::Event &event, void *g) {
-	Gui *gui = (Gui *)g;
-
-	return gui->processConsoleEvents(click, event);
-}
-
 ////////////////
 // Menu stuff
 ////////////////
 void Gui::regenCommandsMenu() {
-	_menu->createSubMenuFromString(_commandsMenuId, _engine->_world->_commandsMenu.c_str());
+	_menu->createSubMenuFromString(_commandsMenuId, _engine->_world->_commandsMenu.c_str(), kMenuActionCommand);
 }
 
 void Gui::regenWeaponsMenu() {
@@ -285,6 +209,10 @@ void Gui::regenWeaponsMenu() {
 	_menu->clearSubMenu(_weaponsMenuId);
 
 	Chr *player = _engine->_world->_player;
+	if (!player) {
+		warning("regenWeaponsMenu: player is not defined");
+		return;
+	}
 	ObjArray *weapons = player->getWeapons(true);
 
 	bool empty = true;
@@ -323,12 +251,20 @@ void Gui::executeMenuCommand(int action, Common::String &text) {
 	switch(action) {
 	case kMenuActionAbout:
 	case kMenuActionNew:
-	case kMenuActionOpen:
 	case kMenuActionClose:
-	case kMenuActionSave:
-	case kMenuActionSaveAs:
 	case kMenuActionRevert:
 	case kMenuActionQuit:
+		warning("STUB: executeMenuCommand: action: %d", action);
+		break;
+
+	case kMenuActionOpen:
+		_engine->scummVMSaveLoadDialog(false);
+		break;
+
+	case kMenuActionSave:
+	case kMenuActionSaveAs:
+		_engine->scummVMSaveLoadDialog(true);
+		break;
 
 	case kMenuActionUndo:
 		actionUndo();
@@ -346,14 +282,130 @@ void Gui::executeMenuCommand(int action, Common::String &text) {
 		actionClear();
 		break;
 
-	case kMenuActionCommand:
-		_engine->processTurn(&text, NULL);
-		break;
+	case kMenuActionCommand: {
+			_engine->_inputText = text;
+			Common::String inp = text + '\n';
 
+			appendText(inp.c_str());
+
+			_consoleWindow->clearInput();
+
+			_engine->processTurn(&text, NULL);
+			break;
+		}
 	default:
 		warning("Unknown action: %d", action);
 
 	}
+}
+
+void Gui::loadBorders() {
+	// Do not load borders for now
+	//loadBorder(_sceneWindow, "border_inac.bmp", false);
+	//loadBorder(_sceneWindow, "border_act.bmp", true);
+}
+
+void Gui::loadBorder(Graphics::MacWindow *target, Common::String filename, bool active) {
+	Common::File borderfile;
+
+	if (!borderfile.open(filename)) {
+		debug(1, "Cannot open border file");
+		return;
+	}
+
+	Image::BitmapDecoder bmpDecoder;
+	Common::SeekableReadStream *stream = borderfile.readStream(borderfile.size());
+	if (stream) {
+
+		target->loadBorder(*stream, active, 10, 10, 1, 1);
+
+		borderfile.close();
+
+		delete stream;
+	}
+}
+
+//////////////////
+// Console stuff
+//////////////////
+const Graphics::MacFont *Gui::getConsoleMacFont() {
+	Scene *scene = _engine->_world->_player->_currentScene;
+
+	return scene->getFont();
+}
+
+const Graphics::Font *Gui::getConsoleFont() {
+	return _wm._fontMan->getFont(*getConsoleMacFont());
+}
+
+void Gui::appendText(const char *s) {
+	_consoleWindow->appendText(s, getConsoleMacFont());
+}
+
+void Gui::clearOutput() {
+	_consoleWindow->clearText();
+}
+
+void Gui::actionCopy() {
+	_clipboard = _consoleWindow->getSelection();
+
+	_menu->enableCommand(kMenuEdit, kMenuActionPaste, true);
+}
+
+void Gui::actionPaste() {
+	_undobuffer = _engine->_inputText;
+
+	_consoleWindow->appendInput(_clipboard);
+
+	_menu->enableCommand(kMenuEdit, kMenuActionUndo, true);
+}
+
+void Gui::actionUndo() {
+	_consoleWindow->clearInput();
+	_consoleWindow->appendInput(_clipboard);
+
+	_menu->enableCommand(kMenuEdit, kMenuActionUndo, false);
+}
+
+void Gui::actionClear() {
+	if (_consoleWindow->getSelectedText()->endY == -1)
+		return;
+
+	Common::String input = _consoleWindow->getInput();
+
+	_consoleWindow->cutSelection();
+
+	_undobuffer = input;
+
+	_menu->enableCommand(kMenuEdit, kMenuActionUndo, true);
+}
+
+void Gui::actionCut() {
+	if (_consoleWindow->getSelectedText()->endY == -1)
+		return;
+
+	Common::String input = _consoleWindow->getInput();
+
+	_clipboard = _consoleWindow->cutSelection();
+
+	_undobuffer = input;
+
+	_menu->enableCommand(kMenuEdit, kMenuActionUndo, true);
+	_menu->enableCommand(kMenuEdit, kMenuActionPaste, true);
+}
+
+void Gui::disableUndo() {
+	_menu->enableCommand(kMenuEdit, kMenuActionUndo, false);
+}
+
+void Gui::disableAllMenus() {
+	_menu->disableAllMenus();
+}
+
+void Gui::enableNewGameMenus() {
+	_menu->enableCommand(kMenuFile, kMenuActionNew, true);
+	_menu->enableCommand(kMenuFile, kMenuActionOpen, true);
+	_menu->enableCommand(kMenuFile, kMenuActionQuit, true);
 }
 
 } // End of namespace Wage

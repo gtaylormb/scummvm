@@ -25,9 +25,6 @@
 
 #include "adl/adl.h"
 
-// Note: this version of ADL redraws only when necessary, but
-// this is not currently implemented.
-
 namespace Common {
 class RandomSource;
 }
@@ -54,9 +51,23 @@ protected:
 	virtual void showRoom();
 	void takeItem(byte noun);
 
+	// Engine
+	bool canSaveGameStateCurrently();
+
+	Common::String getDiskImageName(byte volume) const;
+	void insertDisk(byte volume);
 	virtual DataBlockPtr readDataBlockPtr(Common::ReadStream &f) const;
+	virtual void adjustDataBlockPtr(byte &track, byte &sector, byte &offset, byte &size) const { }
+	void loadItems(Common::ReadStream &stream);
+	void loadRooms(Common::ReadStream &stream, byte count);
+	void loadMessages(Common::ReadStream &stream, byte count);
+	void loadPictures(Common::ReadStream &stream);
+	void loadItemPictures(Common::ReadStream &stream, byte count);
+	virtual bool isInventoryFull() { return false; }
+	int askForSlot(const Common::String &question);
 
 	void checkTextOverflow(char c);
+	void handleTextOverflow();
 
 	int o2_isFirstTime(ScriptEnv &e);
 	int o2_isRandomGT(ScriptEnv &e);
@@ -64,6 +75,8 @@ protected:
 	int o2_isCarryingSomething(ScriptEnv &e);
 
 	int o2_moveItem(ScriptEnv &e);
+	int o2_setCurPic(ScriptEnv &e);
+	int o2_setPic(ScriptEnv &e);
 	int o2_moveAllItems(ScriptEnv &e);
 	int o2_save(ScriptEnv &e);
 	int o2_restore(ScriptEnv &e);
@@ -78,15 +91,15 @@ protected:
 		Common::String restoreInsert, restoreReplace;
 	} _strings_v2;
 
-	uint _linesPrinted;
+	uint _maxLines;
 	DiskImage *_disk;
+	byte _currentVolume;
 	Common::Array<DataBlockPtr> _itemPics;
 	bool _itemRemoved;
 	byte _roomOnScreen, _picOnScreen, _itemsOnScreen;
+	Common::Array<byte> _brokenRooms;
 
 private:
-	int askForSlot(const Common::String &question);
-
 	Common::RandomSource *_random;
 };
 

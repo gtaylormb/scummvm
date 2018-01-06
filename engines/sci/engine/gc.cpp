@@ -46,7 +46,7 @@ const char *segmentTypeNames[] = {
 	"dynmem",    // 9
 	"obsolete",  // 10: obsolete string fragments
 	"array",     // 11: SCI32 arrays
-	"string"     // 12: SCI32 strings
+	"obsolete"   // 12: obsolete SCI32 strings
 };
 #endif
 
@@ -143,22 +143,31 @@ AddrSet *findAllActiveReferences(EngineState *s) {
 	const Common::Array<SegmentObj *> &heap = s->_segMan->getSegments();
 	uint heapSize = heap.size();
 
-	// Init: Explicitly loaded scripts
 	for (uint i = 1; i < heapSize; i++) {
-		if (heap[i] && heap[i]->getType() == SEG_TYPE_SCRIPT) {
-			Script *script = (Script *)heap[i];
+		if (heap[i]) {
+			// Init: Explicitly loaded scripts
+			if (heap[i]->getType() == SEG_TYPE_SCRIPT) {
+				Script *script = (Script *)heap[i];
 
-			if (script->getLockers()) { // Explicitly loaded?
-				wm.pushArray(script->listObjectReferences());
+				if (script->getLockers()) { // Explicitly loaded?
+					wm.pushArray(script->listObjectReferences());
+				}
 			}
-		}
-	}
 
 #ifdef ENABLE_SCI32
-	// Init: ScrollWindows
-	if (g_sci->_gfxControls32)
-		wm.pushArray(g_sci->_gfxControls32->listObjectReferences());
+			// Init: Explicitly opted-out bitmaps
+			else if (heap[i]->getType() == SEG_TYPE_BITMAP) {
+				BitmapTable *bt = static_cast<BitmapTable *>(heap[i]);
+
+				for (uint j = 0; j < bt->_table.size(); j++) {
+					if (bt->_table[j].data && bt->_table[j].data->getShouldGC() == false) {
+						wm.push(make_reg(i, j));
+					}
+				}
+			}
 #endif
+		}
+	}
 
 	debugC(kDebugLevelGC, "[GC] -- Finished explicitly loaded scripts, done with root set");
 

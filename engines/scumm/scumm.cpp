@@ -106,7 +106,8 @@ static const dbgChannelDesc debugChannels[] = {
 	{"ACTORS", "Actor-related debug", DEBUG_ACTORS},
 	{"SOUND", "Sound related debug", DEBUG_SOUND},
 	{"INSANE", "Track INSANE", DEBUG_INSANE},
-	{"SMUSH", "Track SMUSH", DEBUG_SMUSH}
+	{"SMUSH", "Track SMUSH", DEBUG_SMUSH},
+	{"MOONBASEAI", "Track Moonbase AI", DEBUG_MOONBASE_AI}
 };
 
 ScummEngine::ScummEngine(OSystem *syst, const DetectorResult &dr)
@@ -733,8 +734,37 @@ ScummEngine_v0::ScummEngine_v0(OSystem *syst, const DetectorResult &dr)
 	VAR_IS_SOUND_RUNNING = 0xFF;
 	VAR_ACTIVE_VERB = 0xFF;
 
+	DelayReset();
+
 	if (strcmp(dr.fp.pattern, "maniacdemo.d64") == 0 )
 		_game.features |= GF_DEMO;
+}
+
+void ScummEngine_v0::DelayReset() {
+	_V0Delay._screenScroll = false;
+	_V0Delay._objectRedrawCount = 0;
+	_V0Delay._objectStripRedrawCount = 0;
+	_V0Delay._actorRedrawCount = 0;
+	_V0Delay._actorLimbRedrawDrawCount = 0;
+}
+
+int ScummEngine_v0::DelayCalculateDelta() {
+	float Time = 0;
+
+	// These values are made up, based on trial/error with visual inspection against WinVice
+	// If anyone feels inclined, the routines in the original engine could be profiled
+	// and these values changed accordindly.
+	Time += _V0Delay._objectRedrawCount * 7;
+	Time += _V0Delay._objectStripRedrawCount * 0.6;
+	Time += _V0Delay._actorRedrawCount * 2.0;
+	Time += _V0Delay._actorLimbRedrawDrawCount * 0.3;
+
+	if (_V0Delay._screenScroll)
+		Time += 3.6f;
+
+	DelayReset();
+
+	return floor(Time + 0.5);
 }
 
 ScummEngine_v6::ScummEngine_v6(OSystem *syst, const DetectorResult &dr)
@@ -922,7 +952,7 @@ ScummEngine_v100he::~ScummEngine_v100he() {
 ScummEngine_vCUPhe::ScummEngine_vCUPhe(OSystem *syst, const DetectorResult &dr) : Engine(syst){
 	_syst = syst;
 	_game = dr.game;
-	_filenamePattern = dr.fp,
+	_filenamePattern = dr.fp;
 
 	_cupPlayer = new CUP_Player(syst, this, _mixer);
 }
@@ -932,7 +962,7 @@ ScummEngine_vCUPhe::~ScummEngine_vCUPhe() {
 }
 
 Common::Error ScummEngine_vCUPhe::run() {
-	initGraphics(CUP_Player::kDefaultVideoWidth, CUP_Player::kDefaultVideoHeight, true);
+	initGraphics(CUP_Player::kDefaultVideoWidth, CUP_Player::kDefaultVideoHeight);
 
 	if (_cupPlayer->open(_filenamePattern.pattern)) {
 		_cupPlayer->play();
@@ -1217,7 +1247,7 @@ Common::Error ScummEngine::init() {
 
 	// Initialize backend
 	if (_renderMode == Common::kRenderHercA || _renderMode == Common::kRenderHercG) {
-		initGraphics(kHercWidth, kHercHeight, true);
+		initGraphics(kHercWidth, kHercHeight);
 	} else {
 		int screenWidth = _screenWidth;
 		int screenHeight = _screenHeight;
@@ -1236,7 +1266,7 @@ Common::Error ScummEngine::init() {
 			_outputPixelFormat = Graphics::PixelFormat(2, 5, 5, 5, 0, 10, 5, 0, 0);
 
 			if (_game.platform != Common::kPlatformFMTowns && _game.platform != Common::kPlatformPCEngine) {
-				initGraphics(screenWidth, screenHeight, screenWidth > 320, &_outputPixelFormat);
+				initGraphics(screenWidth, screenHeight, &_outputPixelFormat);
 				if (_outputPixelFormat != _system->getScreenFormat())
 					return Common::kUnsupportedColorMode;
 			} else {
@@ -1251,14 +1281,14 @@ Common::Error ScummEngine::init() {
 					}
 				}
 
-				initGraphics(screenWidth, screenHeight, screenWidth > 320, tryModes);
+				initGraphics(screenWidth, screenHeight, tryModes);
 				if (_system->getScreenFormat().bytesPerPixel != 2)
 					return Common::kUnsupportedColorMode;
 			}
 #else
 			if (_game.platform == Common::kPlatformFMTowns && _game.version == 3) {
 				warning("Starting game without the required 16bit color support.\nYou may experience color glitches");
-				initGraphics(screenWidth, screenHeight, (screenWidth > 320));
+				initGraphics(screenWidth, screenHeight);
 			} else {
 				return Common::Error(Common::kUnsupportedColorMode, "16bit color support is required for this game");
 			}
@@ -1268,7 +1298,7 @@ Common::Error ScummEngine::init() {
 		if (_game.platform == Common::kPlatformFMTowns && _game.version == 5)
 			return Common::Error(Common::kUnsupportedColorMode, "This game requires dual graphics layer support which is disabled in this build");
 #endif
-			initGraphics(screenWidth, screenHeight, (screenWidth > 320));
+			initGraphics(screenWidth, screenHeight);
 		}
 	}
 
@@ -2079,13 +2109,24 @@ Common::Error ScummEngine::go() {
 		if (delta < 1)	// Ensure we don't get into an endless loop
 			delta = 1;  // by not decreasing sleepers.
 
-		// WORKAROUND: walking speed in the original v0/v1 interpreter
+		// WORKAROUND: Unfortunately the MOS 6502 wasn't always fast enough for MM
+		//  a number of situations can lead to the engine running at less than 60 ticks per second, without this drop
+		//	- A single kid is able to escape via the Dungeon Door (after pushing the brick)
+		//	- During the intro, calls to 'SetState08' are made for the lights on the mansion, with a 'breakHere'
+		//	  in between each, the reduction in ticks then occurs while affected stripes are being redrawn.
+		//	  The music buildup is then out of sync with the text "A Lucasfilm Games Production".
+		//	  Each call to 'breakHere' has been replaced with calls to 'Delay' in the V1/V2 versions of the game
+		if (_game.version == 0) {
+			delta += ((ScummEngine_v0 *)this)->DelayCalculateDelta();
+		}
+
+		// WORKAROUND: walking speed in the original v1 interpreter
 		// is sometimes slower (e.g. during scrolling) than in ScummVM.
 		// This is important for the door-closing action in the dungeon,
 		// otherwise (delta < 6) a single kid is able to escape.
-		if ((_game.version == 0 && isScriptRunning(132)) ||
-			(_game.version == 1 && isScriptRunning(137)))
-			delta = 6;
+		if (_game.version == 1 && isScriptRunning(137)) {
+				delta = 6;
+		}
 
 		// Wait...
 		waitForTimer(delta * 1000 / 60 - diff);
@@ -2385,14 +2426,14 @@ void ScummEngine::scummLoop_handleSaveLoad() {
 		if (_saveLoadFlag == 1) {
 			success = saveState(_saveLoadSlot, _saveTemporaryState, filename);
 			if (!success)
-				errMsg = _("Failed to save game state to file:\n\n%s");
+				errMsg = _("Failed to save game to file:\n\n%s");
 
 			if (success && _saveTemporaryState && VAR_GAME_LOADED != 0xFF && _game.version <= 7)
 				VAR(VAR_GAME_LOADED) = 201;
 		} else {
 			success = loadState(_saveLoadSlot, _saveTemporaryState, filename);
 			if (!success)
-				errMsg = _("Failed to load game state from file:\n\n%s");
+				errMsg = _("Failed to load saved game from file:\n\n%s");
 
 			if (success && _saveTemporaryState && VAR_GAME_LOADED != 0xFF)
 				VAR(VAR_GAME_LOADED) = (_game.version == 8) ? 1 : 203;
@@ -2403,7 +2444,7 @@ void ScummEngine::scummLoop_handleSaveLoad() {
 		} else if (_saveLoadFlag == 1 && _saveLoadSlot != 0 && !_saveTemporaryState) {
 			// Display "Save successful" message, except for auto saves
 			char buf[256];
-			snprintf(buf, sizeof(buf), _("Successfully saved game state in file:\n\n%s"), filename.c_str());
+			snprintf(buf, sizeof(buf), _("Successfully saved game in file:\n\n%s"), filename.c_str());
 
 			GUI::TimedMessageDialog dialog(buf, 1500);
 			runDialog(dialog);
@@ -2452,6 +2493,8 @@ void ScummEngine_v8::scummLoop_handleSaveLoad() {
 
 void ScummEngine::scummLoop_handleDrawing() {
 	if (camera._cur != camera._last || _bgNeedsRedraw || _fullRedraw) {
+		_V0Delay._screenScroll = true;
+
 		redrawBGAreas();
 	}
 
@@ -2545,6 +2588,30 @@ int ScummEngine_v60he::getHETimer(int timer) {
 void ScummEngine_v60he::setHETimer(int timer) {
 	assertRange(1, timer, 15, "setHETimer: Timer");
 	_heTimers[timer] = _system->getMillis();
+}
+
+void ScummEngine_v60he::pauseHETimers(bool pause) {
+	// The HE timers rely on system time which of course doesn't pause when
+	// the engine does. By adding the elapsed time we compensate for this.
+	// Fixes bug #6352
+	if (pause) {
+		// Pauses can be layered, we only need the start of the first
+		if (!_pauseStartTime)
+			_pauseStartTime = _system->getMillis();
+	} else {
+		int elapsedTime = _system->getMillis() - _pauseStartTime;
+		for (int i = 0; i < ARRAYSIZE(_heTimers); i++) {
+			if (_heTimers[i] != 0)
+				_heTimers[i] += elapsedTime;
+		}
+		_pauseStartTime = 0;
+	}
+}
+
+void ScummEngine_v60he::pauseEngineIntern(bool pause) {
+	pauseHETimers(pause);
+
+	ScummEngine::pauseEngineIntern(pause);
 }
 
 void ScummEngine::pauseGame() {

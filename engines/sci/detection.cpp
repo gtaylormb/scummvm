@@ -22,6 +22,7 @@
 
 #include "engines/advancedDetector.h"
 #include "base/plugins.h"
+#include "common/config-manager.h"
 #include "common/file.h"
 #include "common/ptr.h"
 #include "common/savefile.h"
@@ -107,6 +108,10 @@ static const PlainGameDescriptor s_sciGameTitles[] = {
 	{"pq4",             "Police Quest IV: Open Season"}, // floppy is SCI2, CD SCI2.1
 	{"qfg4",            "Quest for Glory IV: Shadows of Darkness"},	// floppy is SCI2, CD SCI2.1
 	// === SCI2.1 games ========================================================
+	{"hoyle5",          "Hoyle Classic Games"},
+	{"hoyle5bridge",    "Hoyle Bridge"},
+	{"hoyle5children",  "Hoyle Children's Collection"},
+	{"hoyle5solitaire", "Hoyle Solitaire"},
 	{"chest",           "Inside the Chest"},	// aka Behind the Developer's Shield
 	{"gk2",             "The Beast Within: A Gabriel Knight Mystery"},
 	{"kq7",             "King's Quest VII: The Princeless Bride"},
@@ -121,7 +126,7 @@ static const PlainGameDescriptor s_sciGameTitles[] = {
 	// === SCI3 games =========================================================
 	{"lsl7",            "Leisure Suit Larry 7: Love for Sail!"},
 	{"lighthouse",      "Lighthouse: The Dark Being"},
-	{"phantasmagoria2", "Phantasmagoria II: A Puzzle of Flesh"},
+	{"phantasmagoria2", "Phantasmagoria 2: A Puzzle of Flesh"},
 	//{"shivers2",        "Shivers II: Harvest of Souls"},	// Not SCI
 	{"rama",            "RAMA"},
 	{0, 0}
@@ -157,6 +162,10 @@ static const GameIdStrToEnum s_gameIdStrToEnum[] = {
 	{ "hoyle2",          GID_HOYLE2 },
 	{ "hoyle3",          GID_HOYLE3 },
 	{ "hoyle4",          GID_HOYLE4 },
+	{ "hoyle5",          GID_HOYLE5 },
+	{ "hoyle5bridge",    GID_HOYLE5 },
+	{ "hoyle5children",  GID_HOYLE5 },
+	{ "hoyle5solitaire", GID_HOYLE5 },
 	{ "iceman",          GID_ICEMAN },
 	{ "inndemo",         GID_INNDEMO },
 	{ "islandbrain",     GID_ISLANDBRAIN },
@@ -370,6 +379,15 @@ Common::String convertSierraGameId(Common::String sierraId, uint32 *gameFlags, R
 		return "qfg3";
 	}
 
+	if (sierraId == "l7")
+		return "lsl7";
+
+	if (sierraId == "p2")
+		return "phantasmagoria2";
+
+	if (sierraId == "lite")
+		return "lighthouse";
+
 	return sierraId;
 }
 
@@ -397,6 +415,28 @@ static const ADExtraGuiOptionsMap optionsList[] = {
 	},
 
 	{
+		GAMEOPTION_ENABLE_BLACK_LINED_VIDEO,
+		{
+			_s("Enable black-lined video"),
+			_s("Draw black lines over videos to increase their apparent sharpness"),
+			"enable_black_lined_video",
+			false
+		}
+	},
+
+#ifdef USE_RGB_COLOR
+	{
+		GAMEOPTION_HQ_VIDEO,
+		{
+			_s("Use high-quality video scaling"),
+			_s("Use linear interpolation when upscaling videos, where possible"),
+			"enable_hq_video",
+			true
+		}
+	},
+#endif
+
+	{
 		GAMEOPTION_PREFER_DIGITAL_SFX,
 		{
 			_s("Prefer digital sound effects"),
@@ -410,7 +450,7 @@ static const ADExtraGuiOptionsMap optionsList[] = {
 		GAMEOPTION_ORIGINAL_SAVELOAD,
 		{
 			_s("Use original save/load screens"),
-			_s("Use the original save/load screens, instead of the ScummVM ones"),
+			_s("Use the original save/load screens instead of the ScummVM ones"),
 			"originalsaveload",
 			false
 		}
@@ -453,8 +493,19 @@ static const ADExtraGuiOptionsMap optionsList[] = {
 		GAMEOPTION_SQ4_SILVER_CURSORS,
 		{
 			_s("Use silver cursors"),
-			_s("Use the alternate set of silver cursors, instead of the normal golden ones"),
+			_s("Use the alternate set of silver cursors instead of the normal golden ones"),
 			"silver_cursors",
+			false
+		}
+	},
+
+	// Phantasmagoria 2 - content censoring option
+	{
+		GAMEOPTION_ENABLE_CENSORING,
+		{
+			_s("Enable content censoring"),
+			_s("Enable the game's built-in optional content censoring"),
+			"enable_censoring",
 			false
 		}
 	},
@@ -478,10 +529,24 @@ static ADGameDescription s_fallbackDesc = {
 
 static char s_fallbackGameIdBuf[256];
 
+static const char *directoryGlobs[] = {
+	"avi",
+	"english",
+	"french",
+	"german",
+	"italian",
+	"msg",
+	"spanish",
+	0
+};
+
 class SciMetaEngine : public AdvancedMetaEngine {
 public:
 	SciMetaEngine() : AdvancedMetaEngine(Sci::SciGameDescriptions, sizeof(ADGameDescription), s_sciGameTitles, optionsList) {
 		_singleId = "sci";
+		_maxScanDepth = 3;
+		_directoryGlobs = directoryGlobs;
+		_matchFullPaths = true;
 	}
 
 	virtual const char *getName() const {
@@ -538,7 +603,7 @@ const ADGameDescription *SciMetaEngine::fallbackDetect(const FileMap &allFiles, 
 	s_fallbackDesc.guiOptions = GUIO3(GAMEOPTION_PREFER_DIGITAL_SFX, GAMEOPTION_ORIGINAL_SAVELOAD, GAMEOPTION_FB01_MIDI);
 
 	if (allFiles.contains("resource.map") || allFiles.contains("Data1")
-	    || allFiles.contains("resmap.001") || allFiles.contains("resmap.001")) {
+	    || allFiles.contains("resmap.000") || allFiles.contains("resmap.001")) {
 		foundResMap = true;
 	}
 
@@ -547,8 +612,8 @@ const ADGameDescription *SciMetaEngine::fallbackDetect(const FileMap &allFiles, 
 	// the file should be over 10MB, as it contains all the game speech and is usually
 	// around 450MB+. The size check is for some floppy game versions like KQ6 floppy, which
 	// also have a small resource.aud file
-	if (allFiles.contains("resource.aud") || allFiles.contains("audio001.002")) {
-		Common::FSNode file = allFiles.contains("resource.aud") ? allFiles["resource.aud"] :  allFiles["audio001.002"];
+	if (allFiles.contains("resource.aud") || allFiles.contains("resaud.001") || allFiles.contains("audio001.002")) {
+		Common::FSNode file = allFiles.contains("resource.aud") ? allFiles["resource.aud"] : (allFiles.contains("resaud.001") ? allFiles["resaud.001"] : allFiles["audio001.002"]);
 		Common::SeekableReadStream *tmpStream = file.createReadStream();
 		if (tmpStream->size() > 10 * 1024 * 1024) {
 			// We got a CD version, so set the CD flag accordingly
@@ -584,7 +649,7 @@ const ADGameDescription *SciMetaEngine::fallbackDetect(const FileMap &allFiles, 
 	if (!foundResMap && !foundRes000)
 		return 0;
 
-	ResourceManager resMan;
+	ResourceManager resMan(true);
 	resMan.addAppropriateSourcesForDetection(fslist);
 	resMan.init();
 	// TODO: Add error handling.
@@ -609,7 +674,7 @@ const ADGameDescription *SciMetaEngine::fallbackDetect(const FileMap &allFiles, 
 		s_fallbackDesc.platform = Common::kPlatformAmiga;
 
 	// Determine the game id
-	Common::String sierraGameId = resMan.findSierraGameId();
+	Common::String sierraGameId = resMan.findSierraGameId(s_fallbackDesc.platform == Common::kPlatformMacintosh);
 
 	// If we don't have a game id, the game is not SCI
 	if (sierraGameId.empty())
@@ -630,18 +695,18 @@ const ADGameDescription *SciMetaEngine::fallbackDetect(const FileMap &allFiles, 
 	// As far as we know, these games store the messages of each language in separate
 	// resources, and it's not possible to detect that easily
 	// Also look for "%J" which is used in japanese games
-	Resource *text = resMan.findResource(ResourceId(kResourceTypeText, 0), 0);
+	Resource *text = resMan.findResource(ResourceId(kResourceTypeText, 0), false);
 	uint seeker = 0;
 	if (text) {
-		while (seeker < text->size) {
-			if (text->data[seeker] == '#')  {
-				if (seeker + 1 < text->size)
-					s_fallbackDesc.language = charToScummVMLanguage(text->data[seeker + 1]);
+		while (seeker < text->size()) {
+			if (text->getUint8At(seeker) == '#')  {
+				if (seeker + 1 < text->size())
+					s_fallbackDesc.language = charToScummVMLanguage(text->getUint8At(seeker + 1));
 				break;
 			}
-			if (text->data[seeker] == '%') {
-				if ((seeker + 1 < text->size) && (text->data[seeker + 1] == 'J')) {
-					s_fallbackDesc.language = charToScummVMLanguage(text->data[seeker + 1]);
+			if (text->getUint8At(seeker) == '%') {
+				if ((seeker + 1 < text->size()) && (text->getUint8At(seeker + 1) == 'J')) {
+					s_fallbackDesc.language = charToScummVMLanguage(text->getUint8At(seeker + 1));
 					break;
 				}
 			}
@@ -737,6 +802,7 @@ SaveStateList SciMetaEngine::listSaves(const char *target) const {
 	filenames = saveFileMan->listSavefiles(pattern);
 
 	SaveStateList saveList;
+	bool hasAutosave = false;
 	int slotNr = 0;
 	for (Common::StringArray::const_iterator file = filenames.begin(); file != filenames.end(); ++file) {
 		// Obtain the last 3 digits of the filename, since they correspond to the save slot
@@ -746,7 +812,7 @@ SaveStateList SciMetaEngine::listSaves(const char *target) const {
 			Common::InSaveFile *in = saveFileMan->openForLoading(*file);
 			if (in) {
 				SavegameMetadata meta;
-				if (!get_savegame_metadata(in, &meta)) {
+				if (!get_savegame_metadata(in, meta)) {
 					// invalid
 					delete in;
 					continue;
@@ -754,9 +820,9 @@ SaveStateList SciMetaEngine::listSaves(const char *target) const {
 				SaveStateDescriptor descriptor(slotNr, meta.name);
 
 				if (slotNr == 0) {
-					// ScummVM auto-save slot, not used by SCI
-					// SCI does not support auto-saving, but slot 0 is reserved for auto-saving in ScummVM.
+					// ScummVM auto-save slot
 					descriptor.setWriteProtectedFlag(true);
+					hasAutosave = true;
 				} else {
 					descriptor.setWriteProtectedFlag(false);
 				}
@@ -765,6 +831,12 @@ SaveStateList SciMetaEngine::listSaves(const char *target) const {
 				delete in;
 			}
 		}
+	}
+
+	if (!hasAutosave) {
+		SaveStateDescriptor descriptor(0, _("(Autosave)"));
+		descriptor.setLocked(true);
+		saveList.push_back(descriptor);
 	}
 
 	// Sort saves based on slot number.
@@ -777,9 +849,8 @@ SaveStateDescriptor SciMetaEngine::querySaveMetaInfos(const char *target, int sl
 	Common::InSaveFile *in = g_system->getSavefileManager()->openForLoading(fileName);
 	SaveStateDescriptor descriptor(slotNr, "");
 
-	// Do not allow save slot 0 (used for auto-saving) to be deleted or
-	// overwritten. SCI does not support auto-saving, but slot 0 is reserved for auto-saving in ScummVM.
 	if (slotNr == 0) {
+		// ScummVM auto-save slot
 		descriptor.setWriteProtectedFlag(true);
 		descriptor.setDeletableFlag(false);
 	} else {
@@ -789,8 +860,8 @@ SaveStateDescriptor SciMetaEngine::querySaveMetaInfos(const char *target, int sl
 
 	if (in) {
 		SavegameMetadata meta;
-	
-		if (!get_savegame_metadata(in, &meta)) {
+
+		if (!get_savegame_metadata(in, meta)) {
 			// invalid
 			delete in;
 
@@ -837,7 +908,6 @@ void SciMetaEngine::removeSaveState(const char *target, int slot) const {
 
 Common::Error SciEngine::loadGameState(int slot) {
 	_gamestate->_delayedRestoreGameId = slot;
-	_gamestate->_delayedRestoreGame = true;
 	return Common::kNoError;
 }
 
@@ -867,11 +937,23 @@ Common::Error SciEngine::saveGameState(int slot, const Common::String &desc) {
 }
 
 bool SciEngine::canLoadGameStateCurrently() {
+#ifdef ENABLE_SCI32
+	const Common::String &guiOptions = ConfMan.get("guioptions");
+	if (getSciVersion() >= SCI_VERSION_2) {
+		if (ConfMan.getBool("originalsaveload") ||
+			Common::checkGameGUIOption(GUIO_NOLAUNCHLOAD, guiOptions)) {
+
+			return false;
+		}
+	}
+#endif
+
 	return !_gamestate->executionStackBase;
 }
 
 bool SciEngine::canSaveGameStateCurrently() {
-	return !_gamestate->executionStackBase;
+	// see comment about kSupportsSavingDuringRuntime in SciEngine::hasFeature
+	return false;
 }
 
 } // End of namespace Sci

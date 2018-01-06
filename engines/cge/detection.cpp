@@ -159,12 +159,13 @@ const ADGameDescription *CGEMetaEngine::fallbackDetect(const FileMap &allFiles, 
 	if (!game)
 		return nullptr;
 
-	SearchMan.clear();
-	SearchMan.addDirectory(fslist.begin()->getParent().getPath(), fslist.begin()->getParent());
+	SearchMan.addDirectory("CGEMetaEngine::fallbackDetect", fslist.begin()->getParent());
 	ResourceManager *resman;
 	resman = new ResourceManager();
 	bool result = resman->exist("CGE.SAY");
 	delete resman;
+
+	SearchMan.remove("CGEMetaEngine::fallbackDetect");
 
 	if (!result)
 		return nullptr;
@@ -180,7 +181,8 @@ bool CGEMetaEngine::hasFeature(MetaEngineFeature f) const {
 	    (f == kSupportsDeleteSave) ||
 	    (f == kSavesSupportMetaInfo) ||
 	    (f == kSavesSupportThumbnail) ||
-	    (f == kSavesSupportCreationDate);
+	    (f == kSavesSupportCreationDate) ||
+		(f == kSimpleSavesNames);
 }
 
 void CGEMetaEngine::removeSaveState(const char *target, int slot) const {

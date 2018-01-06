@@ -91,8 +91,9 @@ static const char *kSceneNames[] = {
 GnapEngine::GnapEngine(OSystem *syst, const ADGameDescription *gd) :
 	Engine(syst), _gameDescription(gd) {
 
-	_random = new Common::RandomSource("gnap");
 	DebugMan.addDebugChannel(kDebugBasic, "basic", "Basic debug level");
+
+	_random = new Common::RandomSource("gnap");
 
 	Engine::syncSoundSettings();
 
@@ -199,7 +200,7 @@ Common::Error GnapEngine::run() {
 #else
 	Graphics::PixelFormat format = Graphics::PixelFormat(4, 8, 8, 8, 8, 24, 16, 8, 0);
 #endif
-	initGraphics(800, 600, true, &format);
+	initGraphics(800, 600, &format);
 
 	// We do not support color conversion yet
 	if (_system->getScreenFormat() != format)
@@ -247,7 +248,7 @@ Common::Error GnapEngine::run() {
 	_sequenceCache = new SequenceCache(_dat);
 	_gameSys = new GameSys(this);
 	_soundMan = new SoundMan(this);
-	_debugger = new Debugger(this);
+	_debugger = new Debugger();
 	_gnap = new PlayerGnap(this);
 	_plat = new PlayerPlat(this);
 

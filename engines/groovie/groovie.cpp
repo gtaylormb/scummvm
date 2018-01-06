@@ -53,17 +53,6 @@ GroovieEngine::GroovieEngine(OSystem *syst, const GroovieGameDescription *gd) :
 	_graphicsMan(NULL), _macResFork(NULL), _waitingForInput(false), _font(NULL),
 	_spookyMode(false) {
 
-	// Adding the default directories
-	const Common::FSNode gameDataDir(ConfMan.get("path"));
-	SearchMan.addSubDirectoryMatching(gameDataDir, "groovie");
-	SearchMan.addSubDirectoryMatching(gameDataDir, "media");
-	SearchMan.addSubDirectoryMatching(gameDataDir, "system");
-	SearchMan.addSubDirectoryMatching(gameDataDir, "MIDI");
-
-	_modeSpeed = kGroovieSpeedNormal;
-	if (ConfMan.hasKey("fast_movie_speed") && ConfMan.getBool("fast_movie_speed"))
-		_modeSpeed = kGroovieSpeedFast;
-
 	// Initialize the custom debug levels
 	DebugMan.addDebugChannel(kDebugVideo, "Video", "Debug video and audio playback");
 	DebugMan.addDebugChannel(kDebugResource, "Resource", "Debug resource management");
@@ -75,6 +64,17 @@ GroovieEngine::GroovieEngine(OSystem *syst, const GroovieGameDescription *gd) :
 	DebugMan.addDebugChannel(kDebugScriptvars, "Scriptvars", "Print out any change to script variables");
 	DebugMan.addDebugChannel(kDebugCell, "Cell", "Debug the cell game (in the microscope)");
 	DebugMan.addDebugChannel(kDebugFast, "Fast", "Play videos quickly, with no sound (unstable)");
+
+	// Adding the default directories
+	const Common::FSNode gameDataDir(ConfMan.get("path"));
+	SearchMan.addSubDirectoryMatching(gameDataDir, "groovie");
+	SearchMan.addSubDirectoryMatching(gameDataDir, "media");
+	SearchMan.addSubDirectoryMatching(gameDataDir, "system");
+	SearchMan.addSubDirectoryMatching(gameDataDir, "MIDI");
+
+	_modeSpeed = kGroovieSpeedNormal;
+	if (ConfMan.hasKey("fast_movie_speed") && ConfMan.getBool("fast_movie_speed"))
+		_modeSpeed = kGroovieSpeedFast;
 }
 
 GroovieEngine::~GroovieEngine() {
@@ -106,7 +106,7 @@ Common::Error GroovieEngine::run() {
 	case kGroovieV2: {
 		// Request the mode with the highest precision available
 		Graphics::PixelFormat format(4, 8, 8, 8, 8, 24, 16, 8, 0);
-		initGraphics(640, 480, true, &format);
+		initGraphics(640, 480, &format);
 
 		if (_system->getScreenFormat() != format)
 			return Common::kUnsupportedColorMode;
@@ -116,7 +116,7 @@ Common::Error GroovieEngine::run() {
 		break;
 	}
 	case kGroovieT7G:
-		initGraphics(640, 480, true);
+		initGraphics(640, 480);
 		_pixelFormat = Graphics::PixelFormat::createFormatCLUT8();
 		break;
 	}

@@ -30,8 +30,6 @@
 #include "graphics/surface.h"
 #include "graphics/scaler.h"
 
-#ifdef ENABLE_EVENTRECORDER
-
 #define RECORD_VERSION 1
 
 namespace Common {
@@ -392,7 +390,7 @@ void PlaybackFile::readEvent(RecorderEvent& event) {
 		}
 		break;
 	}
-	event.synthetic = true;
+	event.kbdRepeat = true;
 }
 
 void PlaybackFile::readEventsToBuffer(uint32 size) {
@@ -716,5 +714,3 @@ void PlaybackFile::checkRecordedMD5() {
 
 
 }
-
-#endif // ENABLE_EVENTRECORDER

@@ -90,6 +90,24 @@ public:
 	bool getWriteProtectedFlag() const { return _isWriteProtected; }
 
 	/**
+	 * Defines whether the save state is "locked" because is being synced.
+	 */
+	void setLocked(bool state) {
+		_isLocked = state;
+
+		//just in case:
+		if (state) {
+			setDeletableFlag(false);
+			setWriteProtectedFlag(true);
+		}
+	}
+
+	/**
+	* Queries whether the save state is "locked" because is being synced.
+	*/
+	bool getLocked() const { return _isLocked; }
+
+	/**
 	 * Return a thumbnail graphics surface representing the savestate visually.
 	 * This is usually a scaled down version of the game graphics. The size
 	 * should be either 160x100 or 160x120 pixels, depending on the aspect
@@ -103,6 +121,7 @@ public:
 	 * Hence the caller must not delete the surface.
 	 */
 	void setThumbnail(Graphics::Surface *t);
+	void setThumbnail(Common::SharedPtr<Graphics::Surface> t) { _thumbnail = t; }
 
 	/**
 	 * Sets the date the save state was created.
@@ -178,6 +197,11 @@ private:
 	 * Whether the save state is write protected.
 	 */
 	bool _isWriteProtected;
+
+	/**
+	 * Whether the save state is "locked" because is being synced.
+	 */
+	bool _isLocked;
 
 	/**
 	 * Human readable description of the date the save state was created.

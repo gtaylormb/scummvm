@@ -335,6 +335,15 @@ bool String::contains(char x) const {
 	return strchr(c_str(), x) != NULL;
 }
 
+uint64 String::asUint64() const {
+	uint64 result = 0;
+	for (uint32 i = 0; i < _size; ++i) {
+		if (_str[i] < '0' || _str[i] > '9') break;
+		result = result * 10L + (_str[i] - '0');
+	}
+	return result;
+}
+
 bool String::matchString(const char *pat, bool ignoreCase, bool pathMode) const {
 	return Common::matchString(c_str(), pat, ignoreCase, pathMode);
 }
@@ -432,6 +441,44 @@ void String::trim() {
 	if (t != _str) {
 		_size -= t - _str;
 		memmove(_str, t, _size + 1);
+	}
+}
+
+void String::wordWrap(const uint32 maxLength) {
+	if (_size < maxLength) {
+		return;
+	}
+
+	makeUnique();
+
+	enum { kNoSpace = 0xFFFFFFFF };
+
+	uint32 i = 0;
+	while (i < _size) {
+		uint32 lastSpace = kNoSpace;
+		uint32 x = 0;
+		while (i < _size && x <= maxLength) {
+			const char c = _str[i];
+			if (c == '\n') {
+				lastSpace = kNoSpace;
+				x = 0;
+			} else {
+				if (Common::isSpace(c)) {
+					lastSpace = i;
+				}
+				++x;
+			}
+			++i;
+		}
+
+		if (x > maxLength) {
+			if (lastSpace == kNoSpace) {
+				insertChar('\n', i - 1);
+			} else {
+				setChar('\n', lastSpace);
+				i = lastSpace + 1;
+			}
+		}
 	}
 }
 
@@ -829,6 +876,15 @@ bool matchString(const char *str, const char *pat, bool ignoreCase, bool pathMod
 	}
 }
 
+void replace(Common::String &source, const Common::String &what, const Common::String &with) {
+	const char *cstr = source.c_str();
+	const char *position = strstr(cstr, what.c_str());
+	if (position) {
+		uint32 index = position - cstr;
+		source.replace(index, what.size(), with);
+	}
+}
+
 String tag2string(uint32 tag) {
 	char str[5];
 	str[0] = (char)(tag >> 24);
@@ -922,6 +978,13 @@ size_t strlcat(char *dst, const char *src, size_t size) {
 
 	// Return the total length of the result string
 	return dstLength + (src - srcStart);
+}
+
+size_t strnlen(const char *src, size_t maxSize) {
+	size_t counter = 0;
+	while (counter != maxSize && *src++)
+		++counter;
+	return counter;
 }
 
 } // End of namespace Common

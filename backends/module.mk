@@ -19,6 +19,72 @@ MODULE_OBJS := \
 	saves/default/default-saves.o \
 	timer/default/default-timer.o
 
+ifdef USE_CLOUD
+
+ifdef USE_LIBCURL
+MODULE_OBJS += \
+	cloud/cloudicon.o \
+	cloud/cloudmanager.o \
+	cloud/iso8601.o \
+	cloud/storage.o \
+	cloud/storagefile.o \
+	cloud/downloadrequest.o \
+	cloud/folderdownloadrequest.o \
+	cloud/savessyncrequest.o \
+	cloud/box/boxstorage.o \
+	cloud/box/boxlistdirectorybyidrequest.o \
+	cloud/box/boxtokenrefresher.o \
+	cloud/box/boxuploadrequest.o \
+	cloud/dropbox/dropboxstorage.o \
+	cloud/dropbox/dropboxcreatedirectoryrequest.o \
+	cloud/dropbox/dropboxinforequest.o \
+	cloud/dropbox/dropboxlistdirectoryrequest.o \
+	cloud/dropbox/dropboxuploadrequest.o \
+	cloud/googledrive/googledrivelistdirectorybyidrequest.o \
+	cloud/googledrive/googledrivestorage.o \
+	cloud/googledrive/googledrivetokenrefresher.o \
+	cloud/googledrive/googledriveuploadrequest.o \
+	cloud/id/idstorage.o \
+	cloud/id/idcreatedirectoryrequest.o \
+	cloud/id/iddownloadrequest.o \
+	cloud/id/idlistdirectoryrequest.o \
+	cloud/id/idresolveidrequest.o \
+	cloud/id/idstreamfilerequest.o \
+	cloud/onedrive/onedrivestorage.o \
+	cloud/onedrive/onedrivecreatedirectoryrequest.o \
+	cloud/onedrive/onedrivetokenrefresher.o \
+	cloud/onedrive/onedrivelistdirectoryrequest.o \
+	cloud/onedrive/onedriveuploadrequest.o
+endif
+endif
+
+ifdef USE_LIBCURL
+MODULE_OBJS += \
+	networking/curl/connectionmanager.o \
+	networking/curl/networkreadstream.o \
+	networking/curl/curlrequest.o \
+	networking/curl/curljsonrequest.o \
+	networking/curl/request.o
+endif
+
+ifdef USE_SDL_NET
+MODULE_OBJS += \
+	networking/sdl_net/client.o \
+	networking/sdl_net/getclienthandler.o \
+	networking/sdl_net/handlers/createdirectoryhandler.o \
+	networking/sdl_net/handlers/downloadfilehandler.o \
+	networking/sdl_net/handlers/filesajaxpagehandler.o \
+	networking/sdl_net/handlers/filesbasehandler.o \
+	networking/sdl_net/handlers/filespagehandler.o \
+	networking/sdl_net/handlers/indexpagehandler.o \
+	networking/sdl_net/handlers/listajaxhandler.o \
+	networking/sdl_net/handlers/resourcehandler.o \
+	networking/sdl_net/handlers/uploadfilehandler.o \
+	networking/sdl_net/handlerutils.o \
+	networking/sdl_net/localwebserver.o \
+	networking/sdl_net/reader.o \
+	networking/sdl_net/uploadfileclienthandler.o
+endif
 
 ifdef USE_ELF_LOADER
 MODULE_OBJS += \
@@ -73,7 +139,6 @@ MODULE_OBJS += \
 	events/sdl/sdl-events.o \
 	graphics/sdl/sdl-graphics.o \
 	graphics/surfacesdl/surfacesdl-graphics.o \
-	mixer/doublebuffersdl/doublebuffersdl-mixer.o \
 	mixer/sdl/sdl-mixer.o \
 	mutex/sdl/sdl-mutex.o \
 	plugins/sdl/sdl-provider.o \
@@ -89,6 +154,15 @@ ifdef USE_OPENGL
 MODULE_OBJS += \
 	graphics/openglsdl/openglsdl-graphics.o
 endif
+endif
+
+# Connection::isLimited
+ifeq ($(BACKEND),android)
+MODULE_OBJS += \
+	networking/connection/islimited-android.o
+else
+MODULE_OBJS += \
+	networking/connection/islimited-default.o
 endif
 
 ifdef POSIX
@@ -134,6 +208,12 @@ MODULE_OBJS += \
 	fs/amigaos4/amigaos4-fs.o \
 	fs/amigaos4/amigaos4-fs-factory.o \
 	midi/camd.o
+endif
+
+ifdef RISCOS
+MODULE_OBJS += \
+	fs/riscos/riscos-fs.o \
+	fs/riscos/riscos-fs-factory.o
 endif
 
 ifdef PLAYSTATION3
@@ -213,6 +293,15 @@ MODULE_OBJS += \
 	plugins/psp/psp-provider.o \
 	saves/psp/psp-saves.o \
 	timer/psp/timer.o
+endif
+
+ifeq ($(BACKEND),psp2)
+MODULE_OBJS += \
+	fs/posix/posix-fs.o \
+	fs/psp2/psp2-fs-factory.o \
+	fs/psp2/psp2-dirent.o \
+	events/psp2sdl/psp2sdl-events.o \
+	graphics/psp2sdl/psp2sdl-graphics.o
 endif
 
 ifeq ($(BACKEND),samsungtv)

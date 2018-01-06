@@ -145,7 +145,7 @@ static const ADExtraGuiOptionsMap optionsList[] = {
 		GAMEOPTION_ORIGINAL_SAVELOAD,
 		{
 			_s("Use original save/load screens"),
-			_s("Use the original save/load screens, instead of the ScummVM ones"),
+			_s("Use the original save/load screens instead of the ScummVM ones"),
 			"originalsaveload",
 			false
 		}
@@ -231,7 +231,8 @@ bool AgiMetaEngine::hasFeature(MetaEngineFeature f) const {
 	    (f == kSavesSupportMetaInfo) ||
 	    (f == kSavesSupportThumbnail) ||
 	    (f == kSavesSupportCreationDate) ||
-	    (f == kSavesSupportPlayTime);
+	    (f == kSavesSupportPlayTime) ||
+		(f == kSimpleSavesNames);
 }
 
 bool AgiBase::hasFeature(EngineFeature f) const {

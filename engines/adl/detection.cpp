@@ -32,13 +32,15 @@
 
 namespace Adl {
 
-#define GAMEOPTION_COLOR     GUIO_GAMEOPTIONS1
-#define GAMEOPTION_SCANLINES GUIO_GAMEOPTIONS2
-#define GAMEOPTION_MONO      GUIO_GAMEOPTIONS3
+// Mystery House was designed for monochrome display, so we default to
+// monochrome mode there. All the other games default to color mode.
+#define GAMEOPTION_COLOR_DEFAULT_OFF GUIO_GAMEOPTIONS1
+#define GAMEOPTION_SCANLINES         GUIO_GAMEOPTIONS2
+#define GAMEOPTION_COLOR_DEFAULT_ON  GUIO_GAMEOPTIONS3
 
 static const ADExtraGuiOptionsMap optionsList[] = {
 	{
-		GAMEOPTION_COLOR,
+		GAMEOPTION_COLOR_DEFAULT_OFF,
 		{
 			_s("Color mode"),
 			_s("Use color graphics"),
@@ -48,7 +50,7 @@ static const ADExtraGuiOptionsMap optionsList[] = {
 	},
 
 	{
-		GAMEOPTION_MONO,
+		GAMEOPTION_COLOR_DEFAULT_ON,
 		{
 			_s("Color mode"),
 			_s("Use color graphics"),
@@ -74,6 +76,9 @@ static const PlainGameDescriptor adlGames[] = {
 	{ "hires0", "Hi-Res Adventure #0: Mission Asteroid" },
 	{ "hires1", "Hi-Res Adventure #1: Mystery House" },
 	{ "hires2", "Hi-Res Adventure #2: Wizard and the Princess" },
+	{ "hires3", "Hi-Res Adventure #3: Cranston Manor" },
+	{ "hires4", "Hi-Res Adventure #4: Ulysses and the Golden Fleece" },
+	{ "hires5", "Hi-Res Adventure #5: Time Zone" },
 	{ "hires6", "Hi-Res Adventure #6: The Dark Crystal" },
 	{ 0, 0 }
 };
@@ -89,9 +94,9 @@ static const AdlGameDescription gameDescriptions[] = {
 				AD_LISTEND
 			},
 			Common::EN_ANY,
-			Common::kPlatformApple2GS, // FIXME
-			ADGF_UNSTABLE,
-			GUIO2(GAMEOPTION_COLOR, GAMEOPTION_SCANLINES)
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			GUIO2(GAMEOPTION_COLOR_DEFAULT_OFF, GAMEOPTION_SCANLINES)
 		},
 		GAME_TYPE_HIRES1
 	},
@@ -103,9 +108,9 @@ static const AdlGameDescription gameDescriptions[] = {
 				AD_LISTEND
 			},
 			Common::EN_ANY,
-			Common::kPlatformApple2GS, // FIXME
-			ADGF_UNSTABLE,
-			GUIO2(GAMEOPTION_COLOR, GAMEOPTION_SCANLINES)
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			GUIO2(GAMEOPTION_COLOR_DEFAULT_OFF, GAMEOPTION_SCANLINES)
 		},
 		GAME_TYPE_HIRES1
 	},
@@ -117,9 +122,9 @@ static const AdlGameDescription gameDescriptions[] = {
 				AD_LISTEND
 			},
 			Common::EN_ANY,
-			Common::kPlatformApple2GS, // FIXME
-			ADGF_UNSTABLE,
-			GUIO2(GAMEOPTION_MONO, GAMEOPTION_SCANLINES)
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			GUIO2(GAMEOPTION_COLOR_DEFAULT_ON, GAMEOPTION_SCANLINES)
 		},
 		GAME_TYPE_HIRES2
 	},
@@ -131,26 +136,97 @@ static const AdlGameDescription gameDescriptions[] = {
 				AD_LISTEND
 			},
 			Common::EN_ANY,
-			Common::kPlatformApple2GS, // FIXME
-			ADGF_UNSTABLE,
-			GUIO2(GAMEOPTION_MONO, GAMEOPTION_SCANLINES)
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			GUIO2(GAMEOPTION_COLOR_DEFAULT_ON, GAMEOPTION_SCANLINES)
 		},
 		GAME_TYPE_HIRES0
+	},
+	{ // Hi-Res Adventure #3: Cranston Manor - Apple II
+		{
+			"hires3", 0,
+			{
+				{ "CRANSTON.D13", 0, "474d92b845337ec189867fac035304c7", 116480 },
+				AD_LISTEND
+			},
+			Common::EN_ANY,
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			GUIO2(GAMEOPTION_COLOR_DEFAULT_ON, GAMEOPTION_SCANLINES)
+		},
+		GAME_TYPE_HIRES3
+	},
+	{ // Hi-Res Adventure #4: Ulysses and the Golden Fleece - Apple II - Load 'N' Go
+		{
+			"hires4", 0,
+			{
+				{ "ULYSSESA.DSK", 0, "df21f28ae94440f958dbbcfdfaf0c36e", 143360 },
+				{ "ULYSSESB.DSK", 1, "c204e8fe265e9534049f3c0f816cc9fc", 143360 },
+				AD_LISTEND
+			},
+			Common::EN_ANY,
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			GUIO2(GAMEOPTION_COLOR_DEFAULT_ON, GAMEOPTION_SCANLINES)
+		},
+		GAME_TYPE_HIRES4
+	},
+	{ // Hi-Res Adventure #4: Ulysses and the Golden Fleece - Atari 8-bit - Re-release
+		{
+			"hires4", 0,
+			{
+				{ "ULYS1A.XFD", 0, "26365d2b06509fd21e7a7919e33f7199", 92160 },
+				{ "ULYS1B.XFD", 0, "37919c72a4103e6f897ee7daa8261d1d", 92160 },
+				// Load 'N' Go Software release XAG-0646 appears to be missing the second disk
+				{ "ULYS2C.XFD", 0, "ff33830246e65dc71c954acb7fd5621a", 92160 },
+				AD_LISTEND
+			},
+			Common::EN_ANY,
+			Common::kPlatformAtari8Bit,
+			ADGF_UNSTABLE,
+			GUIO2(GAMEOPTION_COLOR_DEFAULT_ON, GAMEOPTION_SCANLINES)
+		},
+		GAME_TYPE_HIRES4
+	},
+	{ // Hi-Res Adventure #5: Time Zone - Apple II - Version 1.1 - Roberta Williams Anthology
+		{
+			"hires5", 0,
+			{
+				{ "TZONE1A.NIB", 2, "475dedb7396fdcea81c1a2a4046caebe", 232960 },
+				{ "TZONE1B.NIB", 3, "f8aaea094ebbe41cf4354d9fe2c30d9a", 232960 },
+				{ "TZONE2C.NIB", 4, "b351a367dc48e776bf08e42a3f50ae74", 232960 },
+				{ "TZONE2D.NIB", 5, "9583b287a5c95960f5335878102bb8b1", 232960 },
+				{ "TZONE3E.NIB", 6, "502e42a0cb69ffe4a48cd51c1ff210cf", 232960 },
+				{ "TZONE3F.NIB", 7, "3d6e0aae15f590b72b6759535b6b7d3c", 232960 },
+				{ "TZONE4G.NIB", 8, "ede4113a9c9e17745faf71d099808a18", 232960 },
+				{ "TZONE4H.NIB", 9, "f95dae4aae1155a27f7120230464d4e1", 232960 },
+				{ "TZONE5I.NIB", 10, "92b3b376877f81a7b7ae426bf1e65456", 232960 },
+				{ "TZONE5J.NIB", 11, "c9ef796fa596548dbf8f085901f0bac3", 232960 },
+				{ "TZONE6K.NIB", 12, "2e5323be637002efce1d4c813ae20a3f", 232960 },
+				{ "TZONE6L.NIB", 13, "7c9268f0ea2d02120c77a46337b3d975", 232960 },
+				AD_LISTEND
+			},
+			Common::EN_ANY,
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			GUIO2(GAMEOPTION_COLOR_DEFAULT_ON, GAMEOPTION_SCANLINES)
+		},
+		GAME_TYPE_HIRES5
 	},
 	{ // Hi-Res Adventure #6: The Dark Crystal - Apple II - Roberta Williams Anthology
 		{
 			"hires6", 0,
 			{
 				{ "DARK1A.DSK", 0, "00c2646d6943d1405717332a6f42d493", 143360 },
-				{ "DARK2A.NIB", 0, "271eb92db107e8d5829437f8ba77991e", 232960 },
-				{ "DARK1B.NIB", 0, "dbedd736617343ade0e6bead8bf2b10c", 232960 },
-				{ "DARK2B.NIB", 0, "cb72044a9b391c4285f4752f746bea2e", 232960 },
+				{ "DARK1B.NIB", 3, "dbedd736617343ade0e6bead8bf2b10c", 232960 },
+				{ "DARK2A.NIB", 4, "271eb92db107e8d5829437f8ba77991e", 232960 },
+				{ "DARK2B.NIB", 5, "cb72044a9b391c4285f4752f746bea2e", 232960 },
 				AD_LISTEND
 			},
 			Common::EN_ANY,
-			Common::kPlatformApple2GS, // FIXME
-			ADGF_UNSTABLE,
-			GUIO2(GAMEOPTION_MONO, GAMEOPTION_SCANLINES)
+			Common::kPlatformApple2,
+			ADGF_NO_FLAGS,
+			GUIO2(GAMEOPTION_COLOR_DEFAULT_ON, GAMEOPTION_SCANLINES)
 		},
 		GAME_TYPE_HIRES6
 	},
@@ -187,6 +263,7 @@ bool AdlMetaEngine::hasFeature(MetaEngineFeature f) const {
 	case kSavesSupportThumbnail:
 	case kSavesSupportCreationDate:
 	case kSavesSupportPlayTime:
+	case kSimpleSavesNames:
 		return true;
 	default:
 		return false;
@@ -294,6 +371,10 @@ void AdlMetaEngine::removeSaveState(const char *target, int slot) const {
 
 Engine *HiRes1Engine_create(OSystem *syst, const AdlGameDescription *gd);
 Engine *HiRes2Engine_create(OSystem *syst, const AdlGameDescription *gd);
+Engine *HiRes0Engine_create(OSystem *syst, const AdlGameDescription *gd);
+Engine *HiRes3Engine_create(OSystem *syst, const AdlGameDescription *gd);
+Engine *HiRes4Engine_create(OSystem *syst, const AdlGameDescription *gd);
+Engine *HiRes5Engine_create(OSystem *syst, const AdlGameDescription *gd);
 Engine *HiRes6Engine_create(OSystem *syst, const AdlGameDescription *gd);
 
 bool AdlMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameDescription *gd) const {
@@ -308,6 +389,18 @@ bool AdlMetaEngine::createInstance(OSystem *syst, Engine **engine, const ADGameD
 		break;
 	case GAME_TYPE_HIRES2:
 		*engine = HiRes2Engine_create(syst, adlGd);
+		break;
+	case GAME_TYPE_HIRES0:
+		*engine = HiRes0Engine_create(syst, adlGd);
+		break;
+	case GAME_TYPE_HIRES3:
+		*engine = HiRes3Engine_create(syst, adlGd);
+		break;
+	case GAME_TYPE_HIRES4:
+		*engine = HiRes4Engine_create(syst, adlGd);
+		break;
+	case GAME_TYPE_HIRES5:
+		*engine = HiRes5Engine_create(syst, adlGd);
 		break;
 	case GAME_TYPE_HIRES6:
 		*engine = HiRes6Engine_create(syst, adlGd);

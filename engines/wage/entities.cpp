@@ -8,12 +8,12 @@
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
  * of the License, or (at your option) any later version.
-
+ *
  * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
-
+ *
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.
@@ -48,11 +48,13 @@
 #include "wage/wage.h"
 #include "wage/entities.h"
 #include "wage/design.h"
+#include "wage/gui.h"
 #include "wage/script.h"
 #include "wage/world.h"
 
 #include "common/memstream.h"
 #include "graphics/managed_surface.h"
+#include "graphics/macgui/macfontmanager.h"
 
 namespace Wage {
 
@@ -80,11 +82,12 @@ Context::Context() {
 }
 
 Scene::Scene() {
+	_resourceId = 0;
+
 	_script = NULL;
 	_design = NULL;
 	_textBounds = NULL;
-	_fontSize = 0;
-	_fontType = 0;
+	_font = NULL;
 
 	for (int i = 0; i < 4; i++)
 		_blocked[i] = false;
@@ -104,10 +107,11 @@ Scene::Scene(Common::String name, Common::SeekableReadStream *data) {
 	_classType = SCENE;
 	_design = new Design(data);
 
+	_resourceId = 0;
+
 	_script = NULL;
 	_textBounds = NULL;
-	_fontSize = 0;
-	_fontType = 0;
+	_font = NULL;
 
 	setDesignBounds(readRect(data));
 	_worldY = data->readSint16BE();
@@ -119,11 +123,11 @@ Scene::Scene(Common::String name, Common::SeekableReadStream *data) {
 	_soundFrequency = data->readSint16BE();
 	_soundType = data->readByte();
 	data->readByte(); // unknown
-	_messages[NORTH] = readPascalString(data);
-	_messages[SOUTH] = readPascalString(data);
-	_messages[EAST] = readPascalString(data);
-	_messages[WEST] = readPascalString(data);
-	_soundName = readPascalString(data);
+	_messages[NORTH] = data->readPascalString();
+	_messages[SOUTH] = data->readPascalString();
+	_messages[EAST] = data->readPascalString();
+	_messages[WEST] = data->readPascalString();
+	_soundName = data->readPascalString();
 
 	_visited = false;
 
@@ -133,6 +137,7 @@ Scene::Scene(Common::String name, Common::SeekableReadStream *data) {
 Scene::~Scene() {
 	delete _script;
 	delete _textBounds;
+	delete _font;
 }
 
 void Scene::paint(Graphics::ManagedSurface *surface, int x, int y) {
@@ -142,65 +147,14 @@ void Scene::paint(Graphics::ManagedSurface *surface, int x, int y) {
 	_design->paint(surface, *((WageEngine *)g_engine)->_world->_patterns, x, y);
 
 	for (ObjList::const_iterator it = _objs.begin(); it != _objs.end(); ++it) {
-		debug(2, "paining Obj: %s, index: %d, type: %d", (*it)->_name.c_str(), (*it)->_index, (*it)->_type);
+		debug(2, "painting Obj: %s, index: %d, type: %d", (*it)->_name.c_str(), (*it)->_index, (*it)->_type);
 		(*it)->_design->paint(surface, *((WageEngine *)g_engine)->_world->_patterns, x, y);
 	}
 
 	for (ChrList::const_iterator it = _chrs.begin(); it != _chrs.end(); ++it) {
-		debug(2, "paining Chr: %s", (*it)->_name.c_str());
+		debug(2, "painting Chr: %s", (*it)->_name.c_str());
 		(*it)->_design->paint(surface, *((WageEngine *)g_engine)->_world->_patterns, x, y);
 	}
-}
-
-// Source: Apple IIGS Technical Note #41, "Font Family Numbers"
-// http://apple2.boldt.ca/?page=til/tn.iigs.041
-static const char *const fontNames[] = {
-	"Chicago",	// system font
-	"Geneva",	// application font
-	"New York",
-	"Geneva",
-
-	"Monaco",
-	"Venice",
-	"London",
-	"Athens",
-
-	"San Francisco",
-	"Toronto",
-	NULL,
-	"Cairo",
-	"Los Angeles", // 12
-
-	"Zapf Dingbats",
-	"Bookman",
-	"Helvetica Narrow",
-	"Palatino",
-	NULL,
-	"Zapf Chancery",
-	NULL,
-
-	"Times", // 20
-	"Helvetica",
-	"Courier",
-	"Symbol",
-	"Taliesin", // mobile?
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL,
-	NULL, // 30
-	NULL,
-	NULL,
-	"Avant Garde",
-	"New Century Schoolbook"
-};
-
-const char *Scene::getFontName() {
-	if (_fontType >= 0 && _fontType < ARRAYSIZE(fontNames) && fontNames[_fontType] != NULL) {
-		return fontNames[_fontType];
-	}
-	return "Unknown";
 }
 
 Designed *Scene::lookUpEntity(int x, int y) {
@@ -221,6 +175,7 @@ Designed *Scene::lookUpEntity(int x, int y) {
 
 Obj::Obj() : _currentOwner(NULL), _currentScene(NULL) {
 	_index = 0;
+	_resourceId = 0;
 	_namePlural = false;
 	_value = 0;
 	_attackType = 0;
@@ -231,7 +186,9 @@ Obj::Obj() : _currentOwner(NULL), _currentScene(NULL) {
 	_damage = 0;
 }
 
-Obj::Obj(Common::String name, Common::SeekableReadStream *data) {
+Obj::Obj(Common::String name, Common::SeekableReadStream *data, int resourceId) {
+	_resourceId = resourceId;
+
 	_name = name;
 	_classType = OBJ;
 	_currentOwner = NULL;
@@ -272,12 +229,12 @@ Obj::Obj(Common::String name, Common::SeekableReadStream *data) {
 	else
 		error("Obj <%s> had weird returnTo set", name.c_str());
 
-	_sceneOrOwner = readPascalString(data);
-	_clickMessage = readPascalString(data);
-	_operativeVerb = readPascalString(data);
-	_failureMessage = readPascalString(data);
-	_useMessage = readPascalString(data);
-	_sound = readPascalString(data);
+	_sceneOrOwner = data->readPascalString();
+	_clickMessage = data->readPascalString();
+	_operativeVerb = data->readPascalString();
+	_failureMessage = data->readPascalString();
+	_useMessage = data->readPascalString();
+	_sound = data->readPascalString();
 
 	delete data;
 }
@@ -322,6 +279,7 @@ Chr::Chr(Common::String name, Common::SeekableReadStream *data) {
 	_design = new Design(data);
 
 	_index = 0;
+	_resourceId = 0;
 	_currentScene = NULL;
 
 	setDesignBounds(readRect(data));
@@ -371,27 +329,27 @@ Chr::Chr(Common::String name, Common::SeekableReadStream *data) {
 	else
 		_nameProperNoun = false;
 
-	_initialScene = readPascalString(data);
-	_nativeWeapon1 = readPascalString(data);
-	_operativeVerb1 = readPascalString(data);
-	_nativeWeapon2 = readPascalString(data);
-	_operativeVerb2 = readPascalString(data);
+	_initialScene = data->readPascalString();
+	_nativeWeapon1 = data->readPascalString();
+	_operativeVerb1 = data->readPascalString();
+	_nativeWeapon2 = data->readPascalString();
+	_operativeVerb2 = data->readPascalString();
 
-	_initialComment = readPascalString(data);
-	_scoresHitComment = readPascalString(data);
-	_receivesHitComment = readPascalString(data);
-	_makesOfferComment = readPascalString(data);
-	_rejectsOfferComment = readPascalString(data);
-	_acceptsOfferComment = readPascalString(data);
-	_dyingWords = readPascalString(data);
+	_initialComment = data->readPascalString();
+	_scoresHitComment = data->readPascalString();
+	_receivesHitComment = data->readPascalString();
+	_makesOfferComment = data->readPascalString();
+	_rejectsOfferComment = data->readPascalString();
+	_acceptsOfferComment = data->readPascalString();
+	_dyingWords = data->readPascalString();
 
-	_initialSound = readPascalString(data);
-	_scoresHitSound = readPascalString(data);
-	_receivesHitSound = readPascalString(data);
-	_dyingSound = readPascalString(data);
+	_initialSound = data->readPascalString();
+	_scoresHitSound = data->readPascalString();
+	_receivesHitSound = data->readPascalString();
+	_dyingSound = data->readPascalString();
 
-	_weaponSound1 = readPascalString(data);
-	_weaponSound2 = readPascalString(data);
+	_weaponSound1 = data->readPascalString();
+	_weaponSound2 = data->readPascalString();
 
 	for (int i = 0; i < NUMBER_OF_ARMOR_TYPES; i++)
 		_armor[i] = NULL;
